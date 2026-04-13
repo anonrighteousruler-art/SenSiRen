@@ -1,0 +1,5 @@
+{
+  "name": "Sensiren",
+  "description": "A split-persona therapeutic companion and research assistant system.",
+  "requestFramePermissions": ["microphone"]
+}
