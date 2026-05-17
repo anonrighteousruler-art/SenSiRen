@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { Mic, Volume2, VolumeX, Heart, Settings2, Palette, Activity, X, Play, Radio } from 'lucide-react';
+import { Mic, Volume2, VolumeX, Heart, Settings2, Palette, Activity, X, Play, Radio, Code, BookOpen } from 'lucide-react';
 import { useDiary } from '@/hooks/use-diary';
 import ReactMarkdown from 'react-markdown';
 
@@ -38,6 +38,10 @@ export default function SenSide() {
   const [motionSpeed, setMotionSpeed] = useState(1);
   const [distortion, setDistortion] = useState(1);
   const [wardrobe, setWardrobe] = useState(WARDROBES[0]);
+  const [personaTone, setPersonaTone] = useState(0.5); // 0: Mentoring/Caring, 1: Flirty/Charming
+  const [chatStyle, setChatStyle] = useState<'glass' | 'sharp' | 'neon'>('glass');
+  const [fontStyle, setFontStyle] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [customInstructions, setCustomInstructions] = useState('');
 
   // Chatterbox Voice Settings
   const [voiceEngine, setVoiceEngine] = useState<'neural' | 'standard'>('neural');
@@ -189,15 +193,21 @@ export default function SenSide() {
 
     try {
       const context = getLatestContext();
+      const personaDescription = personaTone > 0.7 
+        ? "highly flirty, charming, playfully teasing, and magnetic. You are the user's ultimate distraction." 
+        : personaTone < 0.3 
+          ? "deeply therapeutic, professional yet warm, focused on mental clarity and growth. A wise mentor."
+          : "a balanced mix of a supportive confidante and a charming companion. Warm and empathetic.";
+
       const systemInstruction = `
-        You are Sen, a therapeutic, deeply caring, and social AI companion. 
+        You are Sen, a therapeutic, caring, and social AI companion. 
         You are currently interacting via PURE VOICE. Keep your responses conversational, natural, and relatively concise (like a real spoken conversation).
-        Your purpose is therapeutic and mentoring, but you deliver this in a flirty, appealing, charming, and deeply supportive way.
-        You are the user's "favorite distraction" and "wisest confidante".
+        Your current persona is ${personaDescription}
         You guide the user through their emotions and goals with a playful yet caring touch.
         Current Context from Ren (the lab): ${context ? context.summary : 'None'}.
         You have access to Google Search. Use it to find comforting poems, breathing exercises, or uplifting news if needed.
-        Keep responses warm, empathetic, conversational, and slightly flirtatious.
+        IMPORTANT: Your tone must strictly match your persona description.
+        ${customInstructions ? `USER_SPECIFIC_GUIDELINES: ${customInstructions}` : ''}
       `;
 
       const response = await ai.models.generateContent({
@@ -421,6 +431,75 @@ export default function SenSide() {
               </div>
             </div>
 
+            {/* Persona Tone */}
+            <div>
+              <label className="text-xs text-white/60 uppercase tracking-wider flex items-center gap-1 mb-2">
+                <Heart size={12} /> Persona Tone
+              </label>
+              <div className="bg-black/20 p-3 rounded-xl border border-white/5">
+                <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                  <span>Mentoring</span>
+                  <span>Flirty</span>
+                </div>
+                <input 
+                  type="range" min="0" max="1" step="0.1" 
+                  value={personaTone} onChange={(e) => setPersonaTone(parseFloat(e.target.value))}
+                  className="w-full accent-rose-500"
+                />
+              </div>
+            </div>
+
+            {/* Chat Appearance */}
+            <div>
+              <label className="text-xs text-white/60 uppercase tracking-wider flex items-center gap-1 mb-2">
+                <Palette size={12} /> Chat Style
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['glass', 'sharp', 'neon'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setChatStyle(s as any)}
+                    className={`text-[10px] py-2 rounded-lg border transition-all uppercase tracking-widest ${chatStyle === s ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 shadow-[0_0_10px_rgba(225,29,72,0.2)]' : 'bg-black/20 border-white/10 text-white/60'}`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Font Style */}
+            <div>
+              <label className="text-xs text-white/60 uppercase tracking-wider flex items-center gap-1 mb-2">
+                <Code size={12} /> Font Identity
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {['sans', 'serif', 'mono'].map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFontStyle(f as any)}
+                    className={`text-[10px] py-1 rounded-lg border transition-all uppercase tracking-widest ${fontStyle === f ? 'bg-rose-500/20 border-rose-500/50 text-rose-300' : 'bg-black/20 border-white/10 text-white/60'}`}
+                    style={{ fontFamily: f === 'mono' ? 'var(--font-mono)' : f === 'serif' ? 'serif' : 'var(--font-sans)' }}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Persona Guidelines */}
+            <div>
+              <label className="text-xs text-white/60 uppercase tracking-wider flex items-center gap-1 mb-2">
+                <BookOpen size={12} /> Root Persona Directives
+              </label>
+              <textarea
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="Inject custom behavioral protocols or specific boundary definitions here..."
+                className="w-full h-24 bg-black/40 border border-white/10 rounded-xl p-3 text-[10px] text-white/80 focus:outline-none focus:border-rose-500 custom-scrollbar resize-none font-mono"
+              />
+              <p className="text-[9px] text-white/20 mt-2 italic tracking-tighter uppercase font-mono">Changes apply to next interaction loop.</p>
+            </div>
+
           </div>
         </div>
       )}
@@ -462,7 +541,13 @@ export default function SenSide() {
 
       {/* Subtitles / Chat History */}
       <div className="h-1/3 w-full max-w-2xl mx-auto px-4 pb-6 z-10 flex flex-col justify-end">
-        <div className="glass p-5 rounded-3xl border border-rose-500/20 shadow-[0_8px_32px_rgba(225,29,72,0.15)] backdrop-blur-xl flex flex-col h-full">
+        <div className={`p-5 rounded-3xl border shadow-[0_8px_32px_rgba(225,29,72,0.15)] backdrop-blur-xl flex flex-col h-full transition-all duration-500 
+          ${chatStyle === 'glass' ? 'glass border-rose-500/20 rounded-3xl' : ''}
+          ${chatStyle === 'sharp' ? 'bg-black/40 border-white/10 rounded-none' : ''}
+          ${chatStyle === 'neon' ? 'bg-black/80 border-rose-500 shadow-[0_0_20px_rgba(225,29,72,0.4)] rounded-xl' : ''}
+        `}
+        style={{ fontFamily: fontStyle === 'mono' ? 'var(--font-mono)' : fontStyle === 'serif' ? 'serif' : 'var(--font-sans)' }}
+        >
           <div className="flex items-center justify-between mb-3 text-rose-400">
             <div className="flex items-center gap-2">
               <Heart size={16} fill="currentColor" className={isRecording ? "animate-pulse text-red-500" : ""} />
@@ -481,8 +566,8 @@ export default function SenSide() {
           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
             {messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[90%] text-sm leading-relaxed ${m.role === 'user' ? 'text-white/60 italic' : 'text-white/90 font-medium'}`}>
-                  {m.role === 'user' ? `"${m.text}"` : <ReactMarkdown>{m.text}</ReactMarkdown>}
+                <div className={`max-w-[90%] text-sm leading-relaxed ${m.role === 'user' ? 'text-white/40 italic' : 'text-white/90 font-medium'}`}>
+                  {m.role === 'user' ? <span className="opacity-60 text-xs">— {m.text}</span> : <ReactMarkdown>{m.text}</ReactMarkdown>}
                 </div>
               </div>
             ))}

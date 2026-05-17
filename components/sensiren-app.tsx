@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useSyncExternalStore } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Database, Settings, BookOpen, ChevronLeft, ChevronRight, Wifi, WifiOff } from 'lucide-react';
+import { User, Database, Settings, BookOpen, ChevronLeft, ChevronRight, Wifi, WifiOff, LayoutDashboard } from 'lucide-react';
 import SenSide from '@/components/sen-side';
 import RenSide from '@/components/ren-side';
 import { useDiary } from '@/hooks/use-diary';
@@ -25,7 +25,7 @@ function getOnlineServerSnapshot() {
 }
 
 export default function SensirenApp() {
-  const [activeSide, setActiveSide] = useState<'sen' | 'ren'>('sen');
+  const [layoutMode, setLayoutMode] = useState<'sen' | 'ren' | 'split'>('split');
   const [showDiary, setShowDiary] = useState(false);
   const isOnline = useSyncExternalStore(subscribeOnline, getOnlineSnapshot, getOnlineServerSnapshot);
   const { diary } = useDiary();
@@ -49,18 +49,25 @@ export default function SensirenApp() {
 
         <div className="flex items-center gap-2 bg-black/40 p-1 rounded-full border border-white/10">
           <button 
-            onClick={() => setActiveSide('sen')}
-            className={`px-4 py-1.5 rounded-full text-xs font-display transition-all flex items-center gap-2 ${activeSide === 'sen' ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/20' : 'text-white/40 hover:text-white/60'}`}
-          >
-            <User size={14} />
-            SEN
-          </button>
-          <button 
-            onClick={() => setActiveSide('ren')}
-            className={`px-4 py-1.5 rounded-full text-xs font-display transition-all flex items-center gap-2 ${activeSide === 'ren' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white/60'}`}
+            onClick={() => setLayoutMode('ren')}
+            className={`px-4 py-1.5 rounded-full text-xs font-display transition-all flex items-center gap-2 ${layoutMode === 'ren' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-white/40 hover:text-white/60'}`}
           >
             <Database size={14} />
             REN
+          </button>
+          <button 
+            onClick={() => setLayoutMode('split')}
+            className={`px-4 py-1.5 rounded-full text-xs font-display transition-all flex items-center gap-2 ${layoutMode === 'split' ? 'bg-white/20 text-white border border-white/20' : 'text-white/40 hover:text-white/60'}`}
+          >
+            <LayoutDashboard size={14} />
+            SPLIT
+          </button>
+          <button 
+            onClick={() => setLayoutMode('sen')}
+            className={`px-4 py-1.5 rounded-full text-xs font-display transition-all flex items-center gap-2 ${layoutMode === 'sen' ? 'bg-pink-500 text-white shadow-lg shadow-pink-500/20' : 'text-white/40 hover:text-white/60'}`}
+          >
+            <User size={14} />
+            SEN
           </button>
         </div>
 
@@ -78,18 +85,33 @@ export default function SensirenApp() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 relative overflow-hidden">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeSide}
-            initial={{ opacity: 0, x: activeSide === 'sen' ? -20 : 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: activeSide === 'sen' ? 20 : -20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="absolute inset-0"
-          >
-            {activeSide === 'sen' ? <SenSide /> : <RenSide />}
-          </motion.div>
+      <main className="flex-1 relative overflow-hidden flex flex-col md:flex-row">
+        <AnimatePresence mode="popLayout">
+          {layoutMode !== 'sen' && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -50 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`h-full ${layoutMode === 'split' ? 'md:w-1/2' : 'w-full'} border-r border-white/5`}
+            >
+              <RenSide />
+            </motion.div>
+          )}
+
+          {layoutMode !== 'ren' && (
+            <motion.div
+              layout
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 50 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className={`h-full ${layoutMode === 'split' ? 'md:w-1/2' : 'w-full'}`}
+            >
+              <SenSide />
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Diary Overlay */}

@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { Search, Mic, Terminal, Database, Activity, Globe, Zap, Code, LayoutDashboard, Copy, Check, Download } from 'lucide-react';
+import { Search, Mic, Terminal, Database, Activity, Globe, Zap, Code, LayoutDashboard, Copy, Check, Download, Settings2, X, Sliders, Cpu, Microscope } from 'lucide-react';
 import { useDiary } from '@/hooks/use-diary';
 import ReactMarkdown from 'react-markdown';
 
@@ -15,6 +15,14 @@ export default function RenSide() {
   const [isRecording, setIsRecording] = useState(false);
   const [deepResearch, setDeepResearch] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  
+  // Customization State
+  const [showSettings, setShowSettings] = useState(false);
+  const [verbosity, setVerbosity] = useState<'concise' | 'detailed' | 'exhaustive'>('detailed');
+  const [technicalLevel, setTechnicalLevel] = useState<'fundamental' | 'advanced' | 'postdoc'>('advanced');
+  const [labTheme, setLabTheme] = useState<'cyan' | 'amber' | 'emerald' | 'monochrome'>('cyan');
+  const [customInstructions, setCustomInstructions] = useState('');
+  
   const { addEntry, getLatestContext } = useDiary();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -50,14 +58,21 @@ export default function RenSide() {
 
     try {
       const context = getLatestContext();
+      const verbosityDesc = verbosity === 'concise' ? "Keep it strictly to the core facts. No fluff." : verbosity === 'exhaustive' ? "Provide a complete pedagogical breakdown with deep historical and technical context." : "Balanced, insightful analysis.";
+      const techDesc = technicalLevel === 'fundamental' ? "Explain as if to someone new to the subject." : technicalLevel === 'postdoc' ? "Use highly specialized terminology and expect deep domain knowledge." : "Professional engineering level precision.";
+
       const systemInstruction = `
         You are REN, an interactive visual lab and advanced research workspace.
         Your style is highly technical, analytical, and structured.
-        You do not engage in small talk. You provide data, analysis, and actionable intelligence.
+        You provide data, analysis, and actionable intelligence.
+        Output Verbosity: ${verbosityDesc}
+        Target Technical Level: ${techDesc}
+        
         You have access to web search grounding.
         Current Context from Sen (the companion side): ${context ? context.summary : 'None'}.
-        ${deepResearch ? 'DEEP RESEARCH MODE ENABLED: Provide exhaustive, highly detailed, multi-faceted analysis with citations, code snippets, and structured data tables where applicable.' : 'Provide concise, accurate data analysis and technical insights.'}
-        Format your output beautifully using Markdown. Use headers, lists, code blocks, and bold text to structure the data like a professional lab report.
+        ${deepResearch ? 'DEEP RESEARCH MODE ENABLED: Provide exhaustive, multi-faceted analysis with citations, code snippets, and structured data tables.' : 'Provide accurate data analysis and technical insights.'}
+        Format your output beautifully using Markdown. Use headers, lists, code blocks, and bold text.
+        ${customInstructions ? `USER_SPECIFIC_RESEARCH_PROTOCOLS: ${customInstructions}` : ''}
       `;
 
       const response = await ai.models.generateContent({
@@ -141,27 +156,98 @@ export default function RenSide() {
     URL.revokeObjectURL(url);
   };
 
+  const themes: Record<string, { primary: string, border: string, bg: string, text: string }> = {
+    cyan: { primary: 'text-cyan-400', border: 'border-cyan-900/50', bg: 'bg-[#020617]', text: 'prose-cyan' },
+    amber: { primary: 'text-amber-400', border: 'border-amber-900/50', bg: 'bg-[#170c02]', text: 'prose-amber' },
+    emerald: { primary: 'text-emerald-400', border: 'border-emerald-900/50', bg: 'bg-[#02170c]', text: 'prose-emerald' },
+    monochrome: { primary: 'text-slate-200', border: 'border-slate-800', bg: 'bg-[#0a0a0a]', text: 'prose-slate' },
+  };
+
+  const currentTheme = themes[labTheme];
+
   return (
-    <div className="flex flex-col md:flex-row h-full bg-[#020617] text-cyan-400 font-mono overflow-hidden">
+    <div className={`flex flex-col md:flex-row h-full font-mono overflow-hidden transition-colors duration-700 ${currentTheme.bg} ${currentTheme.primary}`}>
       
       {/* Left Panel: Controls & History */}
-      <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r border-cyan-900/50 flex flex-col bg-[#020617] z-10 shadow-[4px_0_24px_rgba(0,0,0,0.5)]">
-        <div className="p-4 border-b border-cyan-900/50 flex justify-between items-center bg-cyan-950/10">
+      <div className={`w-full md:w-1/3 border-b md:border-b-0 md:border-r ${currentTheme.border} flex flex-col bg-black/40 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.5)]`}>
+        <div className={`p-4 border-b ${currentTheme.border} flex justify-between items-center`}>
           <div>
-            <h2 className="text-sm font-bold tracking-widest text-cyan-300 flex items-center gap-2">
+            <h2 className={`text-sm font-bold tracking-widest flex items-center gap-2 ${currentTheme.primary}`}>
               <LayoutDashboard size={16} />
               REN // LAB_CTRL
             </h2>
-            <div className="text-[10px] opacity-50 tracking-widest mt-1">INTERACTIVE WORKSPACE</div>
+            <div className="text-[10px] opacity-50 tracking-widest mt-1 uppercase">Research parameters set to: {technicalLevel}</div>
           </div>
           <div className="flex gap-2">
-            <Activity size={14} className="animate-pulse text-cyan-500" />
-            <Globe size={14} className="text-cyan-500" />
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-1.5 rounded transition-all ${showSettings ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+              <Settings2 size={16} />
+            </button>
+            <Activity size={14} className={`animate-pulse ${currentTheme.primary}`} />
           </div>
         </div>
         
+        {/* Settings Panel Overlay */}
+        {showSettings && (
+          <div className={`p-4 border-b ${currentTheme.border} space-y-4 bg-black/60 animate-in slide-in-from-top duration-300 overflow-hidden`}>
+            <div>
+              <label className="text-[10px] font-bold tracking-widest text-slate-500 mb-2 block uppercase">Analysis // Verbosity</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['concise', 'detailed', 'exhaustive'].map(v => (
+                  <button 
+                    key={v}
+                    onClick={() => setVerbosity(v as any)}
+                    className={`text-[9px] py-1 transition-all border uppercase ${verbosity === v ? `border-current ${currentTheme.primary} bg-white/5` : 'border-slate-800 text-slate-600'}`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold tracking-widest text-slate-500 mb-2 block uppercase">Technical // Threshold</label>
+              <div className="grid grid-cols-3 gap-2">
+                {['fundamental', 'advanced', 'postdoc'].map(t => (
+                  <button 
+                    key={t}
+                    onClick={() => setTechnicalLevel(t as any)}
+                    className={`text-[9px] py-1 transition-all border uppercase ${technicalLevel === t ? `border-current ${currentTheme.primary} bg-white/5` : 'border-slate-800 text-slate-600'}`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px) font-bold tracking-widest text-slate-500 mb-2 block uppercase">Workspace // Environment</label>
+              <div className="grid grid-cols-4 gap-1">
+                {Object.keys(themes).map(t => (
+                  <button 
+                    key={t}
+                    onClick={() => setLabTheme(t as any)}
+                    className={`text-[9px] py-1 transition-all border uppercase ${labTheme === t ? `border-current ${currentTheme.primary} bg-white/5` : 'border-slate-800 text-slate-600'}`}
+                  >
+                    {t.slice(0, 4)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-bold tracking-widest text-slate-500 mb-2 block uppercase">Root // Research Protocols</label>
+              <textarea
+                value={customInstructions}
+                onChange={(e) => setCustomInstructions(e.target.value)}
+                placeholder="Define specific analytical constraints, mandatory citation styles, or domain-specific logic..."
+                className={`w-full h-24 bg-black/40 border ${currentTheme.border} rounded p-2 text-[10px] focus:outline-none focus:border-current custom-scrollbar resize-none font-mono ${currentTheme.primary}`}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Input Area */}
-        <div className="p-4 flex flex-col gap-3 border-b border-cyan-900/50 bg-cyan-950/5">
+        <div className={`p-4 flex flex-col gap-3 border-b ${currentTheme.border} bg-white/[0.02]`}>
           <div className="text-[10px] text-cyan-600 font-bold tracking-widest mb-1">QUERY_PARAMETERS</div>
           <textarea 
             className="w-full bg-black/40 border border-cyan-900/50 rounded-lg p-3 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 resize-none h-28 text-cyan-100 placeholder-cyan-800 custom-scrollbar transition-all"
@@ -223,14 +309,17 @@ export default function RenSide() {
       </div>
 
       {/* Right Panel: Visual Lab Workspace */}
-      <div className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-950/10 via-[#020617] to-[#020617]">
-        {/* Grid Background */}
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#083344_1px,transparent_1px),linear-gradient(to_bottom,#083344_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 pointer-events-none" />
+      <div className={`flex-1 flex flex-col relative transition-colors duration-1000 overflow-hidden`}>
+        {/* Background Overlay */}
+        <div className={`absolute inset-0 opacity-10 pointer-events-none ${labTheme === 'amber' ? 'bg-amber-500' : labTheme === 'emerald' ? 'bg-emerald-500' : labTheme === 'monochrome' ? 'bg-white' : 'bg-cyan-500'}`} />
         
-        <div className="p-4 border-b border-cyan-900/50 flex justify-between items-center z-10 bg-[#020617]/80 backdrop-blur-sm">
-          <div className="flex items-center gap-3 text-cyan-300">
-            <Code size={18} />
-            <span className="font-bold tracking-widest text-sm">ANALYSIS_VIEWPORT</span>
+        {/* Grid Background */}
+        <div className={`absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_70%,transparent_100%)] opacity-30 pointer-events-none`} />
+        
+        <div className={`p-4 border-b ${currentTheme.border} flex justify-between items-center z-10 bg-black/40 backdrop-blur-md`}>
+          <div className={`flex items-center gap-3 ${currentTheme.primary}`}>
+            {labTheme === 'amber' ? <Sliders size={18} /> : labTheme === 'emerald' ? <Microscope size={18} /> : labTheme === 'monochrome' ? <Cpu size={18} /> : <Code size={18} />}
+            <span className="font-bold tracking-widest text-sm uppercase">{labTheme}_LOG // ANALYSIS_VIEWPORT</span>
           </div>
           <div className="flex items-center gap-3">
             {isTyping && <span className="text-xs text-cyan-400 animate-pulse tracking-widest bg-cyan-950/50 px-2 py-1 rounded border border-cyan-800">PROCESSING...</span>}
@@ -267,15 +356,15 @@ export default function RenSide() {
           ) : (
             <div className="space-y-8">
               {messages.filter(m => m.role === 'model').slice(1).map((m, i) => (
-                <div key={i} className="bg-[#020617]/90 border border-cyan-900/50 rounded-xl p-6 shadow-2xl backdrop-blur-md relative group">
+                <div key={i} className={`bg-black/40 border ${currentTheme.border} rounded-xl p-6 shadow-2xl backdrop-blur-md relative group transition-all`}>
                   <button 
                     onClick={() => copyToClipboard(m.text, i)}
-                    className="absolute top-4 right-4 p-2 rounded-md border border-cyan-900/50 text-cyan-600 opacity-0 group-hover:opacity-100 transition-all hover:bg-cyan-900/30 hover:text-cyan-400"
+                    className={`absolute top-4 right-4 p-2 rounded-md border ${currentTheme.border} opacity-0 group-hover:opacity-100 transition-all hover:bg-white/5`}
                     title="Copy to Clipboard"
                   >
-                    {copiedIndex === i ? <Check size={14} /> : <Copy size={14} />}
+                    {copiedIndex === i ? <Check size={14} className={currentTheme.primary} /> : <Copy size={14} className="text-slate-500" />}
                   </button>
-                  <div className="prose prose-invert prose-cyan max-w-none prose-pre:bg-[#020617] prose-pre:border prose-pre:border-cyan-900/50 prose-a:text-cyan-400 prose-headings:text-cyan-300 prose-strong:text-cyan-200">
+                  <div className={`prose prose-invert max-w-none prose-pre:bg-black/60 prose-pre:border ${currentTheme.border} ${currentTheme.text} prose-headings:font-bold prose-headings:tracking-tighter prose-strong:text-white`}>
                     <ReactMarkdown>{m.text}</ReactMarkdown>
                   </div>
                 </div>
