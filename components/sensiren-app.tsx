@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, Database, Settings, BookOpen, ChevronLeft, ChevronRight, Wifi, WifiOff, LayoutDashboard } from 'lucide-react';
 import SenSide from '@/components/sen-side';
 import RenSide from '@/components/ren-side';
+import DiaryPanel from '@/components/diary-panel';
 import { useDiary } from '@/hooks/use-diary';
 
 function subscribeOnline(callback: () => void) {
@@ -74,9 +75,15 @@ export default function SensirenApp() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setShowDiary(!showDiary)}
-            className={`p-2 rounded-full transition-colors ${showDiary ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/60'}`}
+            className={`relative p-2 rounded-full transition-colors ${showDiary ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/60'}`}
+            title="Shared Datalog"
           >
             <BookOpen size={20} />
+            {diary.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-pink-500 text-[9px] leading-4 text-white font-mono">
+                {diary.length > 99 ? '99+' : diary.length}
+              </span>
+            )}
           </button>
           <button className="p-2 rounded-full text-white/40 hover:text-white/60">
             <Settings size={20} />
@@ -124,39 +131,7 @@ export default function SensirenApp() {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="absolute top-0 right-0 bottom-0 w-full max-w-md glass-smoky border-l border-white/10 z-40 p-6 flex flex-col"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-display text-lg font-bold uppercase tracking-widest flex items-center gap-2">
-                  <BookOpen size={20} className="text-white/60" />
-                  Shared Datalog
-                </h2>
-                <button onClick={() => setShowDiary(false)} className="text-white/40 hover:text-white/60">
-                  <ChevronRight size={24} />
-                </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                {diary.length === 0 ? (
-                  <div className="text-center py-20 text-white/20 italic text-sm">
-                    No logs recorded yet.
-                  </div>
-                ) : (
-                  diary.map((entry, i) => (
-                    <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase tracking-tighter ${entry.source === 'Sen' ? 'bg-pink-500/20 text-pink-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                          {entry.source}
-                        </span>
-                        <span className="text-[10px] text-white/20 font-mono">
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      <p className="text-sm text-white/70 leading-relaxed italic">
-                        &quot;{entry.summary}&quot;
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
+              <DiaryPanel onClose={() => setShowDiary(false)} />
             </motion.div>
           )}
         </AnimatePresence>

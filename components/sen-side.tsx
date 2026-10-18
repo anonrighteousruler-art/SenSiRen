@@ -1,10 +1,15 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { GoogleGenAI } from '@google/genai';
-import { Mic, Volume2, VolumeX, Heart, Settings2, Palette, Activity, X, Play, Radio, Code, BookOpen } from 'lucide-react';
+import { Mic, Volume2, VolumeX, Heart, Settings2, Palette, Activity, X, Play, Radio, Code, BookOpen, Send, RotateCcw } from 'lucide-react';
 import { useDiary } from '@/hooks/use-diary';
+import { useDictation, toSpeakable } from '@/hooks/use-speech';
 import ReactMarkdown from 'react-markdown';
+
+// WebGL can't render on the server; load the 3D companion on the client only.
+const SenCharacter = dynamic(() => import('@/components/sen-character'), { ssr: false });
 
 const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '' });
 
@@ -24,7 +29,7 @@ export default function SenSide() {
   const [mood, setMood] = useState('calm');
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [draft, setDraft] = useState('');
   const { addEntry, getLatestContext } = useDiary();
   const chatEndRef = useRef<HTMLDivElement>(null);
   
@@ -52,11 +57,13 @@ export default function SenSide() {
   const [voiceRate, setVoiceRate] = useState(0.95);
 
   useEffect(() => {
-    const context = getLatestContext();
-    let initialGreeting = "Hi there, beautiful. I'm Sen. I'm here to listen, guide, and maybe make you smile. Tap my orb and tell me how you're feeling.";
+    const context = getLatestContext('Sen');
+    let initialGreeting = "Hi there, beautiful. I'm Sen. I'm here to listen, guide, and maybe make you smile. Tap me and tell me how you're feeling.";
     
     if (context && context.source === 'Ren') {
       initialGreeting = `I see you've been busy in the lab with Ren. "${context.summary}". That sounds intense. Come here, take a breath with me. Tap to talk.`;
+    } else if (context && context.source === 'You') {
+      initialGreeting = `I read your last diary note: "${context.summary}". Want to talk about it? Tap me whenever you're ready.`;
     }
     
     setMessages([{ role: 'model', text: initialGreeting }]);
@@ -136,7 +143,7 @@ export default function SenSide() {
         setIsSpeaking(true);
         const response = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
-          contents: [{ parts: [{ text }] }],
+          contents: [{ parts: [{ text: toSpeakable(text) }] }],
           config: {
             responseModalities: ["AUDIO"],
             speechConfig: {
@@ -161,7 +168,7 @@ export default function SenSide() {
       if (!window.speechSynthesis) return;
       window.speechSynthesis.cancel();
       
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(toSpeakable(text));
       utteranceRef.current = utterance; // Prevent GC
       utterance.rate = voiceRate;
       utterance.pitch = voicePitch;
@@ -192,7 +199,7 @@ export default function SenSide() {
     setIsTyping(true);
 
     try {
-      const context = getLatestContext();
+      const context = getLatestContext('Sen');
       const personaDescription = personaTone > 0.7 
         ? "highly flirty, charming, playfully teasing, and magnetic. You are the user's ultimate distraction." 
         : personaTone < 0.3 
@@ -204,7 +211,7 @@ export default function SenSide() {
         You are currently interacting via PURE VOICE. Keep your responses conversational, natural, and relatively concise (like a real spoken conversation).
         Your current persona is ${personaDescription}
         You guide the user through their emotions and goals with a playful yet caring touch.
-        Current Context from Ren (the lab): ${context ? context.summary : 'None'}.
+        Latest entry in the shared diary (from ${context ? context.source : 'nobody'}): ${context ? context.summary : 'None'}.
         You have access to Google Search. Use it to find comforting poems, breathing exercises, or uplifting news if needed.
         IMPORTANT: Your tone must strictly match your persona description.
         ${customInstructions ? `USER_SPECIFIC_GUIDELINES: ${customInstructions}` : ''}
@@ -228,9 +235,7 @@ export default function SenSide() {
       if (modelText.toLowerCase().includes('happy') || modelText.toLowerCase().includes('excited') || modelText.toLowerCase().includes('wink')) setMood('energetic');
       else setMood('calm');
 
-      if (messages.length % 5 === 0) {
-        addEntry('Sen', `User is feeling ${mood}. Latest interaction: ${modelText.slice(0, 50)}...`);
-      }
+      addEntry('Sen', `Talked about "${clip(text, 80)}". Sen: ${clip(modelText, 100)}`, 'conversation');
 
       speak(modelText);
     } catch (error: any) {
@@ -246,37 +251,31 @@ export default function SenSide() {
     }
   };
 
+  const dictation = useDictation({ onFinal: (transcript) => handleSend(transcript) });
+  const isRecording = dictation.isListening;
+
+  const stopSpeaking = () => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (audioSourceRef.current) {
+      audioSourceRef.current.onended = null;
+      audioSourceRef.current.stop();
+      audioSourceRef.current = null;
+    }
+    setIsSpeaking(false);
+  };
+
   const toggleDictation = () => {
     if (typeof window === 'undefined') return;
     initAudio(); // Initialize audio context on user gesture
-    
-    if (!('webkitSpeechRecognition' in window)) {
-      alert("Speech recognition not supported in this browser.");
-      return;
-    }
-    
-    const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    if (!isRecording) stopSpeaking();
+    dictation.toggle();
+  };
 
-    if (isRecording) {
-      recognition.stop();
-      setIsRecording(false);
-    } else {
-      setIsRecording(true);
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-      if (audioSourceRef.current) audioSourceRef.current.stop();
-      setIsSpeaking(false);
-      
-      recognition.start();
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setIsRecording(false);
-        handleSend(transcript);
-      };
-      recognition.onerror = () => setIsRecording(false);
-      recognition.onend = () => setIsRecording(false);
-    }
+  const sendDraft = () => {
+    const text = draft;
+    setDraft('');
+    initAudio();
+    handleSend(text);
   };
 
   const testVoice = () => {
@@ -504,38 +503,38 @@ export default function SenSide() {
         </div>
       )}
 
-      {/* Audio Orb Area */}
-      <div className="flex-1 relative flex flex-col items-center justify-center z-10">
-        <div className="relative flex items-center justify-center w-64 h-64">
-          {/* Outer Glow */}
-          <div 
-            className={`absolute inset-0 rounded-full blur-[60px] opacity-60 transition-all duration-700 ${isSpeaking ? 'scale-150 animate-pulse' : isRecording ? 'scale-125 animate-ping' : 'scale-100'}`} 
-            style={{ backgroundColor: wardrobe.color, animationDuration: `${1 / motionSpeed}s` }} 
+      {/* 3D Companion */}
+      <div className="flex-1 relative flex flex-col items-center justify-center z-10 min-h-0">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label={isRecording ? 'Stop listening' : 'Talk to Sen'}
+          onClick={toggleDictation}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDictation(); } }}
+          className={`relative w-full max-w-md h-full max-h-[420px] cursor-pointer transition-transform duration-500 focus:outline-none ${isRecording ? 'scale-95' : 'hover:scale-[1.02]'}`}
+        >
+          <div
+            className={`absolute inset-[20%] rounded-full blur-[70px] opacity-50 transition-all duration-700 pointer-events-none ${isSpeaking ? 'scale-125 animate-pulse' : isRecording ? 'scale-110 animate-pulse' : 'scale-100'}`}
+            style={{ backgroundColor: wardrobe.color, animationDuration: `${1 / motionSpeed}s` }}
           />
-          
-          {/* Inner Orb */}
-          <button 
-            onClick={toggleDictation}
-            className={`relative w-48 h-48 rounded-full transition-all duration-500 flex items-center justify-center z-10 ${isRecording ? 'scale-95' : 'hover:scale-105'}`}
-            style={{ 
-              background: `radial-gradient(circle at 30% 30%, #ffffff, ${wardrobe.color} 60%, #000000)`,
-              boxShadow: `0 0 ${isSpeaking ? '80px' : '40px'} ${wardrobe.color}, inset 0 0 30px rgba(255,255,255,0.8)`
-            }}
-          >
-            {isRecording ? (
-              <Mic size={48} className="text-white animate-pulse" />
-            ) : isTyping ? (
-              <Activity size={48} className="text-white animate-spin" />
-            ) : (
-              <Mic size={48} className="text-white/70" />
-            )}
-          </button>
+          <SenCharacter
+            mood={mood}
+            isSpeaking={isSpeaking}
+            isListening={isRecording}
+            speedMultiplier={motionSpeed}
+            distortMultiplier={distortion}
+            wardrobe={wardrobe}
+          />
         </div>
         
-        <div className="mt-12 text-center z-10">
-          <p className="text-white/80 font-display tracking-widest uppercase text-sm mb-2 font-bold">
-            {isRecording ? "Listening..." : isTyping ? "Thinking..." : isSpeaking ? "Speaking..." : "Tap orb to speak"}
+        <div className="text-center z-10 px-4">
+          <p className="text-white/80 font-display tracking-widest uppercase text-sm mb-1 font-bold flex items-center justify-center gap-2">
+            {isRecording ? <Mic size={14} className="animate-pulse" /> : isTyping ? <Activity size={14} className="animate-spin" /> : null}
+            {isRecording ? "Listening..." : isTyping ? "Thinking..." : isSpeaking ? "Speaking..." : "Tap Sen to speak"}
           </p>
+          {isRecording && dictation.interim && (
+            <p className="text-xs text-white/50 italic max-w-md mx-auto">{dictation.interim}</p>
+          )}
         </div>
       </div>
 
@@ -565,16 +564,49 @@ export default function SenSide() {
           </div>
           <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-2">
             {messages.map((m, i) => (
-              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={i} className={`flex items-start gap-2 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[90%] text-sm leading-relaxed ${m.role === 'user' ? 'text-white/40 italic' : 'text-white/90 font-medium'}`}>
                   {m.role === 'user' ? <span className="opacity-60 text-xs">— {m.text}</span> : <ReactMarkdown>{m.text}</ReactMarkdown>}
                 </div>
+                {m.role === 'model' && !isMuted && (
+                  <button
+                    onClick={() => { initAudio(); stopSpeaking(); speak(m.text); }}
+                    className="shrink-0 mt-0.5 p-1 rounded-full text-white/30 hover:text-rose-300 transition-colors"
+                    title="Read this back"
+                  >
+                    <RotateCcw size={12} />
+                  </button>
+                )}
               </div>
             ))}
             <div ref={chatEndRef} />
           </div>
+          <form
+            onSubmit={(e) => { e.preventDefault(); sendDraft(); }}
+            className="mt-3 flex items-center gap-2 border-t border-white/10 pt-3"
+          >
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Or type to Sen..."
+              className="flex-1 bg-black/30 border border-white/10 rounded-full px-4 py-2 text-sm text-white/90 placeholder-white/30 focus:outline-none focus:border-rose-500"
+            />
+            <button
+              type="submit"
+              disabled={isTyping || !draft.trim()}
+              className="p-2 rounded-full bg-rose-500/80 hover:bg-rose-500 text-white disabled:opacity-40 transition-colors"
+              title="Send"
+            >
+              <Send size={14} />
+            </button>
+          </form>
         </div>
       </div>
     </div>
   );
+}
+
+function clip(text: string, max: number) {
+  const flat = toSpeakable(text);
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat;
 }

@@ -2,17 +2,25 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { Search, Mic, Terminal, Database, Activity, Globe, Zap, Code, LayoutDashboard, Copy, Check, Download, Settings2, X, Sliders, Cpu, Microscope } from 'lucide-react';
-import { useDiary } from '@/hooks/use-diary';
+import { Search, Mic, Terminal, Database, Activity, Globe, Zap, Code, LayoutDashboard, Copy, Check, Download, Settings2, X, Sliders, Cpu, Microscope, Volume2, Square, GraduationCap } from 'lucide-react';
+import { useDiary, type DiaryKind } from '@/hooks/use-diary';
+import { useDictation, useReadAloud, toSpeakable } from '@/hooks/use-speech';
 import ReactMarkdown from 'react-markdown';
 
 const ai = new GoogleGenAI({ apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '' });
+
+// Study tools turn the latest lab response into learning material.
+const STUDY_TOOLS = [
+  { id: 'summary', label: 'Summarize', prompt: 'Summarize your previous response as 5 key takeaways a student should remember.' },
+  { id: 'flashcards', label: 'Flashcards', prompt: 'Turn your previous response into 6-8 study flashcards. Format each as **Q:** question on one line and **A:** answer on the next.' },
+  { id: 'quiz', label: 'Quiz me', prompt: 'Write a 5-question multiple-choice quiz on your previous response. Put the answer key at the end under a "Answers" heading so I can test myself first.' },
+  { id: 'simplify', label: 'Explain simply', prompt: 'Re-explain your previous response as if teaching a curious beginner, using one everyday analogy.' },
+] as const;
 
 export default function RenSide() {
   const [messages, setMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
   const [deepResearch, setDeepResearch] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   
@@ -27,11 +35,11 @@ export default function RenSide() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const context = getLatestContext();
+    const context = getLatestContext('Ren');
     let initialGreeting = "REN_LAB_INIT. Workspace ready. Awaiting research parameters.";
     
-    if (context && context.source === 'Sen') {
-      initialGreeting = `SYS_LOG: Context imported from Sen. "${context.summary}". Adjusting analytical parameters. Ready.`;
+    if (context) {
+      initialGreeting = `SYS_LOG: Context imported from ${context.source === 'Sen' ? 'Sen' : 'your diary'}. "${context.summary}". Adjusting analytical parameters. Ready.`;
     }
     
     setMessages([{ role: 'model', text: initialGreeting }]);
@@ -42,11 +50,13 @@ export default function RenSide() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (override?: string, kind: DiaryKind = 'research') => {
+    const userMsg = (override ?? input).trim();
+    if (!userMsg || isTyping) return;
 
-    const userMsg = input;
-    setInput('');
+    if (override === undefined) setInput('');
+    dictation.stop();
+    readAloud.stop();
     setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
     
     if (!navigator.onLine) {
@@ -57,7 +67,7 @@ export default function RenSide() {
     setIsTyping(true);
 
     try {
-      const context = getLatestContext();
+      const context = getLatestContext('Ren');
       const verbosityDesc = verbosity === 'concise' ? "Keep it strictly to the core facts. No fluff." : verbosity === 'exhaustive' ? "Provide a complete pedagogical breakdown with deep historical and technical context." : "Balanced, insightful analysis.";
       const techDesc = technicalLevel === 'fundamental' ? "Explain as if to someone new to the subject." : technicalLevel === 'postdoc' ? "Use highly specialized terminology and expect deep domain knowledge." : "Professional engineering level precision.";
 
@@ -69,7 +79,8 @@ export default function RenSide() {
         Target Technical Level: ${techDesc}
         
         You have access to web search grounding.
-        Current Context from Sen (the companion side): ${context ? context.summary : 'None'}.
+        You also act as a study partner: favour clear structure, worked examples and checks for understanding.
+        Latest entry in the shared diary (from ${context ? context.source : 'nobody'}): ${context ? context.summary : 'None'}.
         ${deepResearch ? 'DEEP RESEARCH MODE ENABLED: Provide exhaustive, multi-faceted analysis with citations, code snippets, and structured data tables.' : 'Provide accurate data analysis and technical insights.'}
         Format your output beautifully using Markdown. Use headers, lists, code blocks, and bold text.
         ${customInstructions ? `USER_SPECIFIC_RESEARCH_PROTOCOLS: ${customInstructions}` : ''}
@@ -90,9 +101,10 @@ export default function RenSide() {
       const modelText = response.text || "PROCESS_COMPLETE.";
       setMessages(prev => [...prev, { role: 'model', text: modelText }]);
 
-      if (messages.length % 5 === 0) {
-        addEntry('Ren', `Lab Report: ${userMsg.slice(0, 30)}. Data processed.`);
-      }
+      const firstLine = toSpeakable(modelText).slice(0, 90);
+      addEntry('Ren', kind === 'study'
+        ? `Study session: ${userMsg.split('.')[0]}. ${firstLine}…`
+        : `Researched "${userMsg.slice(0, 60)}". ${firstLine}…`, kind);
     } catch (error: any) {
       console.error(error);
       const errorMessage = error?.message || "";
@@ -106,31 +118,15 @@ export default function RenSide() {
     }
   };
 
-  const toggleDictation = () => {
-    if (typeof window === 'undefined') return;
-    if (!('webkitSpeechRecognition' in window)) {
-      alert("Speech recognition not supported in this browser.");
-      return;
-    }
-    
-    const recognition = new (window as any).webkitSpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+  // Continuous dictation: everything you say is appended to the query box until you stop.
+  const dictation = useDictation({
+    continuous: true,
+    onFinal: (text) => setInput(prev => (prev.trim() ? `${prev.trimEnd()} ${text}` : text)),
+  });
+  const isRecording = dictation.isListening;
+  const readAloud = useReadAloud();
 
-    if (isRecording) {
-      recognition.stop();
-      setIsRecording(false);
-    } else {
-      setIsRecording(true);
-      recognition.start();
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInput(transcript);
-        setIsRecording(false);
-      };
-      recognition.onerror = () => setIsRecording(false);
-    }
-  };
+  const runStudyTool = (prompt: string) => handleSend(prompt, 'study');
 
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -164,6 +160,7 @@ export default function RenSide() {
   };
 
   const currentTheme = themes[labTheme];
+  const hasResponse = messages.filter(m => m.role === 'model').length > 1;
 
   return (
     <div className={`flex flex-col md:flex-row h-full font-mono overflow-hidden transition-colors duration-700 ${currentTheme.bg} ${currentTheme.primary}`}>
@@ -221,7 +218,7 @@ export default function RenSide() {
               </div>
             </div>
             <div>
-              <label className="text-[10px) font-bold tracking-widest text-slate-500 mb-2 block uppercase">Workspace // Environment</label>
+              <label className="text-[10px] font-bold tracking-widest text-slate-500 mb-2 block uppercase">Workspace // Environment</label>
               <div className="grid grid-cols-4 gap-1">
                 {Object.keys(themes).map(t => (
                   <button 
@@ -250,10 +247,12 @@ export default function RenSide() {
         <div className={`p-4 flex flex-col gap-3 border-b ${currentTheme.border} bg-white/[0.02]`}>
           <div className="text-[10px] text-cyan-600 font-bold tracking-widest mb-1">QUERY_PARAMETERS</div>
           <textarea 
+            aria-label="Research query"
             className="w-full bg-black/40 border border-cyan-900/50 rounded-lg p-3 text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 resize-none h-28 text-cyan-100 placeholder-cyan-800 custom-scrollbar transition-all"
             placeholder="Initialize research parameters or paste raw data..."
             value={input}
             onChange={e => setInput(e.target.value)}
+            readOnly={isRecording}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -261,12 +260,17 @@ export default function RenSide() {
               }
             }}
           />
+          {isRecording && (
+            <div className="text-[10px] text-red-400 tracking-widest -mt-1">
+              DICTATING… {dictation.interim && <span className="text-red-300/70 normal-case italic">{dictation.interim}</span>}
+            </div>
+          )}
           <div className="flex justify-between items-center mt-1">
             <div className="flex gap-2">
               <button 
-                onClick={toggleDictation} 
+                onClick={dictation.toggle} 
                 className={`p-2 rounded-md border transition-all ${isRecording ? 'bg-red-900/30 border-red-500 text-red-400 animate-pulse shadow-[0_0_10px_rgba(239,68,68,0.2)]' : 'border-cyan-900/50 text-cyan-600 hover:bg-cyan-900/30 hover:text-cyan-400'}`}
-                title="Voice Input"
+                title={isRecording ? "Stop dictation" : "Dictate (continuous)"}
               >
                 <Mic size={16} />
               </button>
@@ -279,13 +283,33 @@ export default function RenSide() {
               </button>
             </div>
             <button 
-              onClick={handleSend} 
-              disabled={isTyping} 
+              onClick={() => handleSend()} 
+              disabled={isTyping || !input.trim()} 
               className="px-4 py-2 bg-cyan-950 border border-cyan-700 hover:bg-cyan-900 hover:border-cyan-400 rounded-md text-xs font-bold tracking-widest flex items-center gap-2 text-cyan-100 transition-all disabled:opacity-50"
             >
               {isTyping ? <Activity className="animate-spin" size={14} /> : <Search size={14} />}
               EXECUTE
             </button>
+          </div>
+        </div>
+
+        {/* Study Tools */}
+        <div className={`p-4 border-b ${currentTheme.border}`}>
+          <div className="text-[10px] font-bold mb-2 text-cyan-600 tracking-widest flex items-center gap-2">
+            <GraduationCap size={12} /> STUDY_TOOLS
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {STUDY_TOOLS.map(tool => (
+              <button
+                key={tool.id}
+                onClick={() => runStudyTool(tool.prompt)}
+                disabled={isTyping || !hasResponse}
+                className="text-[10px] py-1.5 border border-cyan-900/50 rounded text-cyan-500 hover:bg-cyan-900/30 hover:text-cyan-300 uppercase tracking-widest transition-all disabled:opacity-30 disabled:hover:bg-transparent"
+                title={hasResponse ? tool.prompt : 'Run a query first'}
+              >
+                {tool.label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -297,9 +321,9 @@ export default function RenSide() {
           </div>
           <div className="space-y-2">
             {messages.filter(m => m.role === 'user').slice().reverse().map((m, i) => (
-              <div key={i} className="p-2 border-l-2 border-cyan-700 bg-cyan-950/20 text-xs truncate text-cyan-300/70 hover:bg-cyan-900/40 hover:text-cyan-300 transition-colors cursor-default rounded-r">
+              <button key={i} onClick={() => setInput(m.text)} title="Reuse this query" className="block w-full text-left p-2 border-l-2 border-cyan-700 bg-cyan-950/20 text-xs truncate text-cyan-300/70 hover:bg-cyan-900/40 hover:text-cyan-300 transition-colors rounded-r">
                 <span className="text-cyan-600 mr-2">&gt;</span>{m.text}
-              </div>
+              </button>
             ))}
             {messages.filter(m => m.role === 'user').length === 0 && (
               <div className="text-xs text-cyan-800 italic">No active streams.</div>
@@ -334,7 +358,10 @@ export default function RenSide() {
                   <span className="hidden sm:inline">EXPORT_MD</span>
                 </button>
                 <button 
-                  onClick={() => addEntry('Ren', `Lab Snapshot saved.`)}
+                  onClick={() => {
+                    const last = [...messages].reverse().find(m => m.role === 'model');
+                    addEntry('Ren', `Lab snapshot: ${last ? toSpeakable(last.text).slice(0, 140) : 'empty workspace'}`, 'snapshot');
+                  }}
                   className="text-cyan-600 hover:text-cyan-400 transition-colors flex items-center gap-1 text-xs border border-cyan-900/50 px-2 py-1 rounded"
                   title="Save Snapshot to Datalog"
                 >
@@ -348,22 +375,34 @@ export default function RenSide() {
 
         <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar z-10">
           {messages.length <= 1 && !isTyping ? (
-            <div className="h-full flex flex-col items-center justify-center opacity-20">
-              <Terminal size={64} className="mb-6 text-cyan-500" />
-              <div className="tracking-widest text-lg font-bold text-cyan-500">AWAITING_INPUT</div>
-              <div className="text-xs mt-2 text-cyan-600">Enter parameters in LAB_CTRL to begin.</div>
+            <div className="h-full flex flex-col items-center justify-center">
+              <div className="opacity-20 flex flex-col items-center">
+                <Terminal size={64} className="mb-6 text-cyan-500" />
+                <div className="tracking-widest text-lg font-bold text-cyan-500">AWAITING_INPUT</div>
+                <div className="text-xs mt-2 text-cyan-600">Enter parameters in LAB_CTRL to begin.</div>
+              </div>
+              {messages[0] && <div className="text-xs mt-6 max-w-md text-center text-cyan-400/70">{messages[0].text}</div>}
             </div>
           ) : (
             <div className="space-y-8">
               {messages.filter(m => m.role === 'model').slice(1).map((m, i) => (
                 <div key={i} className={`bg-black/40 border ${currentTheme.border} rounded-xl p-6 shadow-2xl backdrop-blur-md relative group transition-all`}>
-                  <button 
-                    onClick={() => copyToClipboard(m.text, i)}
-                    className={`absolute top-4 right-4 p-2 rounded-md border ${currentTheme.border} opacity-0 group-hover:opacity-100 transition-all hover:bg-white/5`}
-                    title="Copy to Clipboard"
-                  >
-                    {copiedIndex === i ? <Check size={14} className={currentTheme.primary} /> : <Copy size={14} className="text-slate-500" />}
-                  </button>
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <button
+                      onClick={() => readAloud.toggle(`ren-${i}`, m.text)}
+                      className={`p-2 rounded-md border ${currentTheme.border} transition-all hover:bg-white/5 ${readAloud.speakingId === `ren-${i}` ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
+                      title={readAloud.speakingId === `ren-${i}` ? 'Stop reading' : 'Read aloud'}
+                    >
+                      {readAloud.speakingId === `ren-${i}` ? <Square size={14} className={currentTheme.primary} /> : <Volume2 size={14} className="text-slate-500" />}
+                    </button>
+                    <button 
+                      onClick={() => copyToClipboard(m.text, i)}
+                      className={`p-2 rounded-md border ${currentTheme.border} opacity-0 group-hover:opacity-100 focus:opacity-100 transition-all hover:bg-white/5`}
+                      title="Copy to Clipboard"
+                    >
+                      {copiedIndex === i ? <Check size={14} className={currentTheme.primary} /> : <Copy size={14} className="text-slate-500" />}
+                    </button>
+                  </div>
                   <div className={`prose prose-invert max-w-none prose-pre:bg-black/60 prose-pre:border ${currentTheme.border} ${currentTheme.text} prose-headings:font-bold prose-headings:tracking-tighter prose-strong:text-white`}>
                     <ReactMarkdown>{m.text}</ReactMarkdown>
                   </div>

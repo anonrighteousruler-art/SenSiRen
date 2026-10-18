@@ -2,7 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Sphere, MeshDistortMaterial, Float, Environment, ContactShadows } from '@react-three/drei';
+import { Sphere, MeshDistortMaterial, Float, Environment, Lightformer, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 
 interface Wardrobe {
@@ -103,12 +103,17 @@ export default function SenCharacter({
   wardrobe?: Wardrobe
 }) {
   return (
-    <div className="w-full h-full min-h-[400px]">
+    <div className="w-full h-full min-h-[240px]">
       <Canvas camera={{ position: [0, 0, 4.5], fov: 50 }}>
         <ambientLight intensity={0.6} />
         <pointLight position={[10, 10, 10]} intensity={1.5} color="#ffd1ff" />
         <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={1} color="#ff9a9e" />
-        <Environment preset="sunset" />
+        {/* Reflections built from local light panels: presets fetch an HDR from a CDN and crash the scene offline. */}
+        <Environment resolution={256}>
+          <Lightformer intensity={2} color="#ffb38a" position={[0, 5, -9]} scale={[10, 10, 1]} />
+          <Lightformer intensity={1.5} color="#ff6f91" position={[-5, 1, -1]} rotation-y={Math.PI / 2} scale={[20, 2, 1]} />
+          <Lightformer intensity={1} color="#c3a6ff" position={[5, -1, -1]} rotation-y={-Math.PI / 2} scale={[20, 2, 1]} />
+        </Environment>
         <CharacterMesh 
           mood={mood} 
           isSpeaking={isSpeaking} 
