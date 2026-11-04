@@ -1,0 +1,1114 @@
+<title>SenSiRen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one screen, two rooms side by side (Ren's lab left, Sen's lounge right) with a shared diary drawer on the right edge. */
+:root {
+  color-scheme: dark;
+  --bg: #0c0811;
+  --panel: #140e1b;
+  --panel-2: #1b1324;
+  --line: #2e2338;
+  --ink: #f4ecf3;
+  --muted: #a898ab;
+  --faint: #6f6175;
+  --sen: #ff5c8a;
+  --sen-warm: #ffa772;
+  --sen-ink: #ffd3df;
+  --ren: #56dfcb;
+  --ren-dim: #2c7f74;
+  --ren-bg: #08141a;
+  --ren-panel: #0c1c23;
+  --ren-line: #173640;
+  --ren-ink: #c9f6ee;
+  --you: #8db4ff;
+  --danger: #ff6b6b;
+  --on-accent: #1a0710;
+  --font-display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --step--1: 0.78rem;
+  --step-0: 0.92rem;
+  --step-1: 1.08rem;
+  --step-2: 1.35rem;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  overflow: hidden;
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+* { box-sizing: border-box; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+:focus-visible { outline: 2px solid var(--you); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+#root { height: 100%; }
+.app { height: 100%; display: flex; flex-direction: column; }
+
+/* Header */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.wordmark { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); letter-spacing: 0.04em; margin: 0; }
+.wordmark .s { color: var(--sen); }
+.wordmark .i { color: var(--faint); }
+.wordmark .r { color: var(--ren); }
+.status { font-size: var(--step--1); color: var(--muted); white-space: nowrap; }
+.status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--faint); vertical-align: 1px; }
+.status.ok .dot { background: var(--ren); }
+.status.warn .dot { background: var(--sen-warm); }
+.switch { display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.switch button {
+  border: 0; background: transparent; padding: 6px 14px; border-radius: 999px;
+  font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.12em; color: var(--muted);
+}
+.switch button[aria-pressed="true"].sen { background: var(--sen); color: var(--on-accent); }
+.switch button[aria-pressed="true"].ren { background: var(--ren); color: #04211c; }
+.switch button[aria-pressed="true"].split { background: var(--panel-2); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line); }
+.log-btn {
+  display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--panel);
+  border-radius: 999px; padding: 6px 12px; font-size: var(--step--1); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.log-btn[aria-pressed="true"] { border-color: var(--you); color: var(--you); }
+.count { font-family: var(--font-mono); font-variant-numeric: tabular-nums; background: var(--you); color: #071433; border-radius: 999px; padding: 0 7px; font-size: 0.7rem; }
+
+/* Main grid */
+.main { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; position: relative; }
+.main.split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.pane { min-height: 0; min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+@media (max-width: 900px) {
+  .main.split { grid-template-columns: minmax(0, 1fr); }
+  .main.split .pane.ren { display: none; }
+  .switch .split { display: none; }
+}
+
+/* ---------- Sen ---------- */
+.sen-pane {
+  position: relative;
+  background:
+    radial-gradient(60% 50% at 50% 38%, color-mix(in srgb, var(--orb, var(--sen)) 22%, transparent), transparent 70%),
+    radial-gradient(40% 35% at 85% 90%, color-mix(in srgb, var(--sen-warm) 14%, transparent), transparent 70%),
+    var(--bg);
+}
+.sen-tools {
+  position: absolute; top: 12px; right: max(12px, env(safe-area-inset-right, 0px)); z-index: 3; display: flex; gap: 6px;
+}
+.icon-btn {
+  width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 80%, transparent); color: var(--muted);
+}
+.icon-btn:hover { color: var(--ink); }
+.icon-btn[aria-pressed="true"] { color: var(--sen); border-color: var(--sen); }
+.icon-btn svg { width: 16px; height: 16px; }
+.stage { flex: 1 1 auto; min-height: 200px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.orb-wrap {
+  position: relative; width: min(100%, 420px); height: 100%; max-height: 380px; min-height: 180px;
+  border: 0; background: transparent; padding: 0; border-radius: 40%;
+}
+.orb-wrap canvas { width: 100%; height: 100%; display: block; }
+.orb-fallback {
+  position: absolute; inset: 18%; border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, #fff, var(--orb, var(--sen)) 55%, #12040a);
+  box-shadow: 0 0 60px var(--orb, var(--sen));
+  animation: breathe 4s ease-in-out infinite;
+}
+@keyframes breathe { 50% { transform: scale(1.05); } }
+.stage-label { font-family: var(--font-display); font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--sen-ink); margin: 4px 0 0; }
+.interim { font-style: italic; color: var(--muted); font-size: var(--step--1); max-width: 40ch; text-align: center; min-height: 1.4em; margin: 2px 0 0; padding-inline: 16px; }
+
+.transcript {
+  margin: 0 auto 14px; width: min(100% - 32px, 680px);
+  border: 1px solid color-mix(in srgb, var(--sen) 30%, var(--line));
+  background: color-mix(in srgb, var(--panel) 88%, transparent);
+  border-radius: 22px; display: flex; flex-direction: column; max-height: 42%; min-height: 170px;
+}
+.transcript-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px 4px; }
+.eyebrow { font-size: 0.68rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sen); font-weight: 600; }
+.msgs { flex: 1; overflow-y: auto; padding: 4px 16px 8px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+.msg { display: flex; gap: 8px; align-items: flex-start; max-width: 100%; }
+.msg.you { justify-content: flex-end; }
+.msg p { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.msg.sen p { color: var(--ink); font-weight: 500; }
+.msg.you p { color: var(--muted); font-style: italic; font-size: var(--step--1); text-align: right; }
+.msg .replay { flex: none; border: 0; background: none; color: var(--faint); padding: 2px; }
+.msg .replay:hover, .msg .replay[aria-pressed="true"] { color: var(--sen); }
+.msg .replay svg { width: 14px; height: 14px; }
+.composer { display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
+.composer input {
+  flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 9px 14px;
+}
+.composer input:focus { outline: none; border-color: var(--sen); }
+.round {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; border: 0; display: grid; place-items: center;
+  background: var(--sen); color: var(--on-accent);
+}
+.round.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.round.ghost.live { border-color: var(--danger); color: var(--danger); animation: pulse 1.2s ease-in-out infinite; }
+.round svg { width: 16px; height: 16px; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--danger) 25%, transparent); } }
+
+.popover {
+  position: absolute; top: 54px; right: max(12px, env(safe-area-inset-right, 0px)); z-index: 4; width: min(320px, calc(100% - 24px));
+  max-height: calc(100% - 70px); overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid; gap: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+.popover h3 { margin: 0; font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--sen-ink); }
+.field { display: grid; gap: 6px; }
+.field label, .field .label { font-size: var(--step--1); color: var(--muted); display: flex; justify-content: space-between; }
+.field input[type="range"] { width: 100%; accent-color: var(--sen); }
+.field select { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px; width: 100%; }
+.swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+.swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; }
+.swatch[aria-pressed="true"] { border-color: var(--ink); }
+.toggle-row { display: flex; justify-content: space-between; align-items: center; font-size: var(--step--1); color: var(--muted); }
+
+/* ---------- Ren ---------- */
+.ren-pane { background: var(--ren-bg); color: var(--ren-ink); font-family: var(--font-mono); border-right: 1px solid var(--line); }
+.ren-layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
+@media (max-width: 1250px) { .main.split .ren-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .main.split .ren-side .history { display: none; } }
+@media (max-width: 700px) { .ren-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); } .ren-side .history { display: none; } }
+.ren-side { border-right: 1px solid var(--ren-line); display: flex; flex-direction: column; min-height: 0; overflow-y: auto; background: var(--ren-panel); }
+.ren-block { padding: 14px 16px; border-bottom: 1px solid var(--ren-line); display: grid; gap: 10px; }
+.ren-label { font-size: 0.66rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ren); font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ren-label .meta { color: var(--ren-dim); letter-spacing: 0.08em; }
+.ren-side textarea {
+  width: 100%; height: 104px; resize: vertical; background: var(--ren-bg); border: 1px solid var(--ren-line); border-radius: 8px;
+  padding: 10px; color: var(--ren-ink); font-family: var(--font-mono); font-size: 0.82rem;
+}
+.ren-side textarea:focus { outline: none; border-color: var(--ren); }
+.ren-side textarea::placeholder { color: var(--ren-dim); }
+.ren-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ren-btn {
+  border: 1px solid var(--ren-line); background: transparent; color: var(--ren); border-radius: 6px;
+  padding: 6px 10px; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.ren-btn:hover:not(:disabled) { border-color: var(--ren); background: color-mix(in srgb, var(--ren) 8%, transparent); }
+.ren-btn[aria-pressed="true"] { border-color: var(--ren); background: color-mix(in srgb, var(--ren) 14%, transparent); }
+.ren-btn.live { border-color: var(--danger); color: var(--danger); }
+.ren-btn.primary { background: var(--ren); color: #04211c; border-color: var(--ren); margin-left: auto; }
+.ren-btn svg { width: 14px; height: 14px; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.seg .ren-btn { justify-content: center; padding: 5px 4px; font-size: 0.64rem; }
+.tools-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.tools-grid .ren-btn { justify-content: center; }
+.history { display: grid; gap: 4px; padding: 14px 16px; }
+.history button {
+  text-align: left; border: 0; border-left: 2px solid var(--ren-dim); background: color-mix(in srgb, var(--ren) 5%, transparent);
+  color: var(--ren-ink); opacity: 0.75; padding: 6px 8px; font-family: var(--font-mono); font-size: 0.74rem;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.history button:hover { opacity: 1; border-left-color: var(--ren); }
+.dictating { font-size: 0.7rem; color: var(--danger); letter-spacing: 0.1em; }
+.dictating i { color: var(--ren-ink); opacity: 0.7; letter-spacing: 0; }
+
+.viewport { min-height: 0; overflow-y: auto; position: relative; }
+.viewport-head {
+  position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 18px; background: color-mix(in srgb, var(--ren-bg) 92%, transparent); border-bottom: 1px solid var(--ren-line);
+  backdrop-filter: blur(6px);
+}
+.viewport-body {
+  padding: 20px 18px 40px; display: grid; gap: 18px; align-content: start;
+  background-image: linear-gradient(var(--ren-line) 1px, transparent 1px), linear-gradient(90deg, var(--ren-line) 1px, transparent 1px);
+  background-size: 48px 48px; background-position: -1px -1px;
+  background-color: var(--ren-bg);
+  min-height: calc(100% - 52px);
+}
+.card { background: var(--ren-panel); border: 1px solid var(--ren-line); border-radius: 12px; overflow: hidden; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; padding: 12px 14px; border-bottom: 1px solid var(--ren-line); }
+.card-q { margin: 0; font-size: 0.8rem; color: var(--ren); min-width: 0; overflow-wrap: anywhere; }
+.card-q .kind { color: var(--ren-dim); margin-right: 8px; text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.64rem; }
+.card-actions { display: flex; gap: 4px; flex: none; }
+.card-actions .ren-btn { padding: 5px 7px; }
+.tag { display: inline-block; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--sen-warm); border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px; margin-bottom: 6px; }
+.md { padding: 4px 18px 16px; font-family: var(--font-body); font-size: var(--step-0); line-height: 1.6; color: var(--ren-ink); overflow-wrap: anywhere; }
+.md h1, .md h2, .md h3 { font-family: var(--font-mono); color: var(--ren); letter-spacing: -0.01em; text-wrap: balance; margin: 1.1em 0 0.4em; }
+.md h1 { font-size: 1.15rem; } .md h2 { font-size: 1.02rem; } .md h3 { font-size: 0.92rem; }
+.md p { margin: 0.6em 0; max-width: 70ch; }
+.md ul, .md ol { padding-left: 1.3em; max-width: 70ch; }
+.md strong { color: #ffffff; }
+.md code { font-family: var(--font-mono); font-size: 0.85em; background: var(--ren-bg); border: 1px solid var(--ren-line); border-radius: 4px; padding: 0 4px; }
+.md pre { background: var(--ren-bg); border: 1px solid var(--ren-line); border-radius: 8px; padding: 12px; overflow-x: auto; }
+.md pre code { border: 0; padding: 0; }
+.md table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; font-size: 0.85rem; }
+.md th, .md td { border: 1px solid var(--ren-line); padding: 6px 10px; text-align: left; }
+.md th { color: var(--ren); font-family: var(--font-mono); font-weight: 500; }
+.md a { color: var(--ren); }
+.md blockquote { margin: 0.6em 0; padding-left: 12px; border-left: 2px solid var(--ren-dim); color: var(--ren-ink); opacity: 0.85; }
+.err { padding: 12px 18px; color: var(--danger); font-size: 0.8rem; margin: 0; }
+.thinking { padding: 16px 18px; color: var(--ren); font-size: 0.8rem; letter-spacing: 0.1em; margin: 0; }
+.thinking::after { content: "▍"; animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---------- Diary drawer ---------- */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 20; width: min(420px, 100%);
+  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -20px 0 60px rgba(0, 0, 0, 0.5);
+  display: flex; flex-direction: column; gap: 14px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px)); padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: 18px; padding-right: max(18px, env(safe-area-inset-right, 0px));
+  transform: translateX(105%); transition: transform 0.28s ease;
+}
+.drawer.open { transform: none; }
+.drawer-head { display: flex; justify-content: space-between; align-items: center; }
+.drawer h2 { margin: 0; font-family: var(--font-display); font-size: var(--step-1); letter-spacing: 0.06em; text-wrap: balance; }
+.drawer .where { margin: 2px 0 0; font-size: var(--step--1); color: var(--muted); }
+.note-box { border: 1px solid var(--line); border-radius: 14px; background: var(--bg); padding: 10px 12px; display: grid; gap: 8px; }
+.note-box textarea { background: transparent; border: 0; resize: none; height: 72px; width: 100%; color: var(--ink); }
+.note-box textarea:focus { outline: none; }
+.note-box textarea::placeholder { color: var(--faint); }
+.note-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pill { border: 0; border-radius: 999px; padding: 6px 14px; background: var(--you); color: #071433; font-weight: 600; font-size: var(--step--1); }
+.filters { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chips { display: flex; gap: 4px; }
+.chip { border: 1px solid transparent; background: transparent; color: var(--muted); border-radius: 999px; padding: 3px 10px; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.chip[aria-pressed="true"] { border-color: var(--line); background: var(--panel-2); color: var(--ink); }
+.mini { border: 0; background: none; color: var(--muted); padding: 4px; display: inline-grid; place-items: center; }
+.mini:hover:not(:disabled) { color: var(--ink); }
+.mini.danger:hover:not(:disabled) { color: var(--danger); }
+.mini svg { width: 15px; height: 15px; }
+.entries { flex: 1; min-height: 0; overflow-y: auto; display: grid; gap: 8px; align-content: start; padding-right: 2px; }
+.entry { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); display: grid; gap: 6px; }
+.entry-top { display: flex; align-items: center; gap: 8px; }
+.src { font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; border-radius: 999px; padding: 1px 8px; font-weight: 600; }
+.src.Sen { background: color-mix(in srgb, var(--sen) 18%, transparent); color: var(--sen); }
+.src.Ren { background: color-mix(in srgb, var(--ren) 16%, transparent); color: var(--ren); }
+.src.You { background: color-mix(in srgb, var(--you) 18%, transparent); color: var(--you); }
+.kind-l { font-size: 0.66rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.1em; }
+.when { margin-left: auto; font-family: var(--font-mono); font-size: 0.66rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+.entry p { margin: 0; color: var(--ink); opacity: 0.85; overflow-wrap: anywhere; }
+.empty { color: var(--faint); text-align: center; padding: 40px 10px; font-style: italic; }
+.confirm { display: flex; gap: 8px; align-items: center; font-size: var(--step--1); color: var(--danger); flex-wrap: wrap; }
+.confirm button { border: 1px solid var(--line); background: var(--bg); border-radius: 999px; padding: 3px 10px; font-size: var(--step--1); }
+.confirm .yes { border-color: var(--danger); color: var(--danger); }
+.scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 19; border: 0; }
+
+/* Toasts */
+.toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 30; display: grid; gap: 8px; width: min(92vw, 440px); }
+.toast { background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; font-size: var(--step--1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+
+<div id="root"><p style="padding:24px;color:#a898ab">Loading SenSiRen…</p></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+<script>
+(function () {
+  const { useState, useEffect, useRef, useCallback, useSyncExternalStore } = React;
+  const html = htm.bind(React.createElement);
+  const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- platform capabilities ----------
+  function capUse(name) {
+    try {
+      if (!window.claude || typeof window.claude.use !== "function") return Promise.resolve(null);
+      return window.claude.use(name).catch(() => null);
+    } catch (e) { return Promise.resolve(null); }
+  }
+
+  // ---------- tiny stores ----------
+  function createStore(initial) {
+    let state = initial;
+    const listeners = new Set();
+    return {
+      get: () => state,
+      set(next) { state = typeof next === "function" ? next(state) : next; listeners.forEach(l => l()); },
+      subscribe(l) { listeners.add(l); return () => listeners.delete(l); },
+    };
+  }
+  function useStore(store) { return useSyncExternalStore(store.subscribe, store.get, store.get); }
+
+  const Toasts = createStore([]);
+  function toast(text) {
+    const id = Math.random().toString(36).slice(2);
+    Toasts.set(t => [...t, { id, text }].slice(-3));
+    setTimeout(() => Toasts.set(t => t.filter(x => x.id !== id)), 5200);
+  }
+
+  // ---------- text helpers ----------
+  function toSpeakable(md) {
+    return String(md || "")
+      .replace(/```[\s\S]*?```/g, " Code block omitted. ")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/^\s*#{1,6}\s+/gm, "")
+      .replace(/^\s*[-*+]\s+/gm, "")
+      .replace(/^\s*\|?\s*:?-{2,}.*$/gm, "")
+      .replace(/\|/g, ", ")
+      .replace(/[*_~>#]+/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  function clip(text, max) {
+    const flat = toSpeakable(text);
+    return flat.length > max ? flat.slice(0, max - 1) + "…" : flat;
+  }
+  DOMPurify.addHook("afterSanitizeAttributes", node => {
+    if (node.tagName === "A") { node.setAttribute("target", "_blank"); node.setAttribute("rel", "noopener noreferrer"); }
+  });
+  function mdToHtml(md) {
+    try { return DOMPurify.sanitize(marked.parse(md || "")); } catch (e) { return DOMPurify.sanitize(md || ""); }
+  }
+  function dateStamp() { return new Date().toISOString().slice(0, 10); }
+  function sampleErrorCopy(e) {
+    const code = e && e.code;
+    if (code === "not_granted") return "Claude replies are switched off for this page. Allow Claude in the page's Permissions menu, then send again.";
+    if (code === "rate_limited" || code === "queue_overflow") return "Too many requests at once. Wait a moment, then send again.";
+    if (code === "prompt_too_large") return "That's more text than Claude can take in one go. Shorten it and send again.";
+    if (code === "refused") return "Claude declined to answer that one. Try rephrasing it.";
+    if (code === "session_expired") return "Your Claude session expired. Reload the page and sign in again.";
+    if (code === "sampling_disabled" || code === "capability_disabled" || code === "capability_removed") return "Claude replies are turned off for your account or organization.";
+    return "Claude didn't answer this time. Send again in a moment.";
+  }
+
+  // ---------- shared diary (private to the viewer; account storage when available) ----------
+  const LOCAL_KEY = "sensiren_diary_v1";
+  const Diary = (() => {
+    const store = createStore({ entries: [], ready: false, where: "this browser" });
+    let col = null;
+    const readLocal = () => { try { return JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]"); } catch (e) { return []; } };
+    const writeLocal = list => { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); } catch (e) { /* storage blocked */ } };
+    const makeId = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8);
+
+    async function init() {
+      store.set({ entries: readLocal(), ready: false, where: "this browser" });
+      const [db, user] = await Promise.all([capUse("db"), capUse("user")]);
+      const uid = user ? await user.id().catch(() => null) : null;
+      if (!db || !uid) { store.set(s => ({ ...s, ready: true })); return; }
+      col = db.collection("data/users/" + uid);
+      col.orderBy("ts", "desc").limit(300).onSnapshot(
+        snap => store.set({ entries: snap.docs.map(d => ({ id: d.id, ...d.data() })), ready: true, where: "your Claude account" }),
+        err => {
+          console.warn("diary sync failed", err);
+          col = null;
+          store.set({ entries: readLocal(), ready: true, where: "this browser" });
+        },
+      );
+      // Notes written in this browser before account storage connected move into it.
+      const pending = readLocal();
+      for (const e of pending) {
+        try { await col.doc(e.id).set({ ts: e.ts, source: e.source, kind: e.kind, summary: e.summary }); } catch (err) { return; }
+      }
+      if (pending.length) writeLocal([]);
+    }
+
+    function add(source, summary, kind) {
+      const text = String(summary || "").trim();
+      if (!text) return;
+      const entry = { id: makeId(), ts: Date.now(), source, kind: kind || (source === "Ren" ? "research" : source === "Sen" ? "conversation" : "note"), summary: text.slice(0, 1200) };
+      if (col) {
+        col.doc(entry.id).set({ ts: entry.ts, source: entry.source, kind: entry.kind, summary: entry.summary })
+          .catch(() => toast("Couldn't save that diary entry. Check your connection and try again."));
+      } else {
+        const next = [entry, ...store.get().entries].slice(0, 300);
+        writeLocal(next);
+        store.set(s => ({ ...s, entries: next }));
+      }
+    }
+    function remove(id) {
+      if (col) { col.doc(id).delete().catch(() => toast("Couldn't delete that entry. Try again.")); return; }
+      const next = store.get().entries.filter(e => e.id !== id);
+      writeLocal(next);
+      store.set(s => ({ ...s, entries: next }));
+    }
+    async function clear() {
+      const all = store.get().entries;
+      if (col) { for (const e of all) { try { await col.doc(e.id).delete(); } catch (err) { toast("Couldn't clear every entry. Try again."); return; } } return; }
+      writeLocal([]);
+      store.set(s => ({ ...s, entries: [] }));
+    }
+    const latestFrom = exclude => store.get().entries.find(e => e.source !== exclude) || null;
+    const contextLines = n => store.get().entries.slice(0, n).map(e => `- ${e.source} (${e.kind}, ${new Date(e.ts).toLocaleDateString()}): ${e.summary}`).join("\n") || "- (empty so far)";
+    const toMarkdown = list => ["# SenSiRen diary", "", ...list.map(e => `- **${new Date(e.ts).toLocaleString()}** · ${e.source} · _${e.kind}_ — ${e.summary}`), ""].join("\n");
+    return { store, init, add, remove, clear, latestFrom, contextLines, toMarkdown };
+  })();
+
+  // ---------- read-back (speech synthesis) ----------
+  const Voice = (() => {
+    const store = createStore({ speakingId: null, voices: [] });
+    let current = null;
+    const supported = typeof window !== "undefined" && "speechSynthesis" in window;
+    function loadVoices() { if (supported) store.set(s => ({ ...s, voices: window.speechSynthesis.getVoices() })); }
+    if (supported) { loadVoices(); window.speechSynthesis.onvoiceschanged = loadVoices; }
+    function stop() {
+      if (!supported) return;
+      current = null;
+      window.speechSynthesis.cancel();
+      store.set(s => ({ ...s, speakingId: null }));
+    }
+    function speak(id, text, opts) {
+      if (!supported) { toast("Read-back isn't supported in this browser."); return; }
+      opts = opts || {};
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(toSpeakable(text));
+      u.rate = opts.rate || 1;
+      u.pitch = opts.pitch || 1;
+      const v = opts.voiceName && store.get().voices.find(x => x.name === opts.voiceName);
+      if (v) u.voice = v;
+      const done = () => { if (current === u) { current = null; store.set(s => ({ ...s, speakingId: null })); } };
+      u.onend = done; u.onerror = done;
+      current = u; // keep a reference so the utterance isn't garbage-collected mid-sentence
+      store.set(s => ({ ...s, speakingId: id }));
+      window.speechSynthesis.speak(u);
+    }
+    function toggle(id, text, opts) { if (store.get().speakingId === id) stop(); else speak(id, text, opts); }
+    return { store, speak, stop, toggle, supported };
+  })();
+
+  // ---------- dictation (speech recognition) ----------
+  function getRecognition() { return window.SpeechRecognition || window.webkitSpeechRecognition || null; }
+  function useDictation({ continuous, onFinal }) {
+    const [listening, setListening] = useState(false);
+    const [interim, setInterim] = useState("");
+    const recRef = useRef(null);
+    const finalRef = useRef(onFinal);
+    finalRef.current = onFinal;
+
+    const stop = useCallback(() => { if (recRef.current) recRef.current.stop(); }, []);
+    const start = useCallback(() => {
+      const Ctor = getRecognition();
+      if (!Ctor) { toast("Dictation needs Chrome, Edge or Safari. You can type instead."); return; }
+      if (recRef.current) recRef.current.abort();
+      let rec;
+      try { rec = new Ctor(); } catch (e) { toast("Dictation couldn't start here. You can type instead."); return; }
+      rec.continuous = !!continuous;
+      rec.interimResults = true;
+      rec.lang = navigator.language || "en-US";
+      rec.onresult = ev => {
+        let pending = "";
+        for (let i = ev.resultIndex; i < ev.results.length; i++) {
+          const r = ev.results[i];
+          if (r.isFinal) { const t = r[0].transcript.trim(); if (t) finalRef.current(t); }
+          else pending += r[0].transcript;
+        }
+        setInterim(pending);
+      };
+      rec.onerror = ev => {
+        const code = ev && ev.error;
+        if (code === "not-allowed" || code === "service-not-allowed" || code === "audio-capture")
+          toast("The microphone isn't available in this view. Type instead, or open the page in its own browser tab.");
+        else if (code === "no-speech") toast("I didn't catch anything. Tap the mic and try again.");
+        else if (code !== "aborted") toast("Dictation stopped unexpectedly. Tap the mic to try again.");
+      };
+      rec.onend = () => { setListening(false); setInterim(""); if (recRef.current === rec) recRef.current = null; };
+      recRef.current = rec;
+      setListening(true);
+      try { rec.start(); } catch (e) { setListening(false); recRef.current = null; toast("Dictation couldn't start here. You can type instead."); }
+    }, [continuous]);
+    const toggle = useCallback(() => { if (recRef.current) stop(); else start(); }, [start, stop]);
+    useEffect(() => () => { if (recRef.current) recRef.current.abort(); }, []);
+    return { listening, interim, start, stop, toggle };
+  }
+
+  // ---------- icons ----------
+  const I = {
+    mic: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`,
+    send: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l16-8-6 16-2-7-8-1z"/></svg>`,
+    speaker: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>`,
+    muted: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/></svg>`,
+    stop: html`<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>`,
+    gear: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>`,
+    close: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+    copy: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg>`,
+    pin: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h12l4 4v12H4z"/><path d="M8 4v5h7"/></svg>`,
+    download: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>`,
+    trash: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>`,
+    book: html`<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H4zM20 4h-4a2 2 0 0 0-2 2"/></svg>`,
+    replay: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>`,
+    bolt: html`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>`,
+  };
+
+  // ---------- export helper ----------
+  let downloadsPromise = null;
+  async function offerFile(filename, text) {
+    if (!downloadsPromise) downloadsPromise = capUse("downloads");
+    const dl = await downloadsPromise;
+    if (dl) {
+      try { await dl.save({ filename, data: new Blob([text], { type: "text/markdown" }) }); return; }
+      catch (e) { if (e && e.code === "cancelled") return; }
+    }
+    try { await navigator.clipboard.writeText(text); toast("Saving files isn't available here, so the Markdown was copied to your clipboard."); }
+    catch (e) { toast("Saving files isn't available in this view."); }
+  }
+  async function copyText(text) {
+    try { await navigator.clipboard.writeText(text); toast("Copied."); }
+    catch (e) { toast("Copying isn't allowed in this view. Select the text and copy it instead."); }
+  }
+
+  // ---------- 3D companion ----------
+  const WARDROBES = [
+    { id: "rose", name: "Rose", color: "#ff5c8a" },
+    { id: "ember", name: "Ember", color: "#ff9259" },
+    { id: "amethyst", name: "Amethyst", color: "#a78bfa" },
+    { id: "lagoon", name: "Lagoon", color: "#38bdf8" },
+    { id: "pearl", name: "Pearl", color: "#f1e6ee" },
+  ];
+
+  function Orb({ phase, color, onActivate, label }) {
+    const hostRef = useRef(null);
+    const phaseRef = useRef(phase);
+    const matRef = useRef(null);
+    const [failed, setFailed] = useState(false);
+    phaseRef.current = phase;
+
+    useEffect(() => {
+      const host = hostRef.current;
+      let renderer;
+      try {
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      } catch (e) { setFailed(true); return; }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      host.appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 50);
+      camera.position.set(0, 0, 4.6);
+
+      const geo = new THREE.SphereGeometry(1.15, 128, 96);
+      const base = Float32Array.from(geo.attributes.position.array);
+      const mat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: 0.18, roughness: 0.22, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.12 });
+      matRef.current = mat;
+      const mesh = new THREE.Mesh(geo, mat);
+      scene.add(mesh);
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.62, 32, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 }));
+      scene.add(core);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+      const key = new THREE.PointLight(0xffd1e6, 1.6, 30); key.position.set(4, 4, 6); scene.add(key);
+      const rim = new THREE.PointLight(0xff8a5c, 1.4, 30); rim.position.set(-5, -2, 2); scene.add(rim);
+      const cool = new THREE.PointLight(0x9d8cff, 1.0, 30); cool.position.set(0, -4, -3); scene.add(cool);
+
+      function resize() {
+        const w = host.clientWidth || 300, h = host.clientHeight || 300;
+        renderer.setSize(w, h, false);
+        camera.aspect = w / h;
+        camera.fov = w < h ? 52 : 42;
+        camera.updateProjectionMatrix();
+      }
+      resize();
+      const ro = new ResizeObserver(resize);
+      ro.observe(host);
+
+      const TUNE = {
+        idle: { amp: 0.07, speed: 0.7, spin: 0.15 },
+        listening: { amp: 0.045, speed: 0.45, spin: 0.08 },
+        thinking: { amp: 0.09, speed: 1.8, spin: 0.7 },
+        speaking: { amp: 0.14, speed: 2.6, spin: 0.25 },
+      };
+      let amp = 0.07, speed = 0.7, spin = 0.15, t = 0, last = performance.now(), raf = 0;
+      const pos = geo.attributes.position;
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000); last = now;
+        const target = TUNE[phaseRef.current] || TUNE.idle;
+        const k = 1 - Math.pow(0.02, dt);
+        amp += (target.amp - amp) * k; speed += (target.speed - speed) * k; spin += (target.spin - spin) * k;
+        t += dt * speed * (REDUCED ? 0.3 : 1);
+        const a = pos.array;
+        for (let i = 0; i < a.length; i += 3) {
+          const x = base[i], y = base[i + 1], z = base[i + 2];
+          const n = Math.sin(x * 2.1 + t) * Math.sin(y * 2.4 + t * 1.3) * Math.sin(z * 1.9 + t * 0.7)
+                  + 0.5 * Math.sin(x * 4.3 - t * 1.7 + z * 2.0) * Math.sin(y * 3.7 + t * 0.9);
+          const s = 1 + amp * n;
+          a[i] = x * s; a[i + 1] = y * s; a[i + 2] = z * s;
+        }
+        pos.needsUpdate = true;
+        geo.computeVertexNormals();
+        mesh.rotation.y += dt * spin;
+        mesh.rotation.x = Math.sin(t * 0.3) * 0.25;
+        const ph = phaseRef.current;
+        const pulse = ph === "speaking" ? 1 + Math.sin(now / 90) * 0.035 : ph === "listening" ? 1 + Math.sin(now / 420) * 0.03 : 1;
+        mesh.scale.setScalar(pulse);
+        mesh.position.y = REDUCED ? 0 : Math.sin(now / 1400) * 0.06;
+        core.position.y = mesh.position.y;
+        renderer.render(scene, camera);
+        raf = requestAnimationFrame(frame);
+      }
+      raf = requestAnimationFrame(frame);
+      return () => {
+        cancelAnimationFrame(raf); ro.disconnect();
+        geo.dispose(); mat.dispose(); renderer.dispose();
+        if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+      };
+    }, []);
+
+    useEffect(() => {
+      if (matRef.current) { matRef.current.color.set(color); matRef.current.emissive.set(color); }
+    }, [color]);
+
+    return html`<button type="button" className="orb-wrap" ref=${hostRef} onClick=${onActivate} aria-label=${label}>
+      ${failed ? html`<span className="orb-fallback"></span>` : null}
+    </button>`;
+  }
+
+  // ---------- Sen ----------
+  function senGreeting() {
+    const ctx = Diary.latestFrom("Sen");
+    if (ctx && ctx.source === "Ren") return `You've been busy in the lab with Ren: "${clip(ctx.summary, 90)}" Come take a breath with me. Tap me and tell me how it went.`;
+    if (ctx && ctx.source === "You") return `I read your last diary note: "${clip(ctx.summary, 90)}" Want to talk about it? Tap me whenever you're ready.`;
+    return "Hi, I'm Sen. I'm here to listen, cheer you on, and keep you company. Tap me and tell me how you're feeling, or type below.";
+  }
+
+  function SenPane({ sample, hidden }) {
+    const diary = useStore(Diary.store);
+    const voice = useStore(Voice.store);
+    const [msgs, setMsgs] = useState(() => [{ role: "sen", text: senGreeting(), greeting: true }]);
+    const [draft, setDraft] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
+    const [prefs, setPrefs] = useState(() => {
+      const d = { tone: 0.5, wardrobe: "rose", voiceName: "", rate: 1, pitch: 1.1, muted: false, autoListen: false };
+      try { return { ...d, ...JSON.parse(localStorage.getItem("sensiren_sen_prefs") || "{}") }; } catch (e) { return d; }
+    });
+    const msgsRef = useRef(msgs);
+    msgsRef.current = msgs;
+    const listRef = useRef(null);
+
+    useEffect(() => { try { localStorage.setItem("sensiren_sen_prefs", JSON.stringify(prefs)); } catch (e) { /* storage blocked */ } }, [prefs]);
+    useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [msgs]);
+    // The diary loads after first paint; refresh the greeting once it arrives if nothing has been said yet.
+    useEffect(() => {
+      if (diary.ready) setMsgs(m => (m.length === 1 && m[0].greeting ? [{ role: "sen", text: senGreeting(), greeting: true }] : m));
+    }, [diary.ready]);
+
+    const wardrobe = WARDROBES.find(w => w.id === prefs.wardrobe) || WARDROBES[0];
+    const speaking = !!(voice.speakingId && voice.speakingId.startsWith("sen-"));
+    const voiceOpts = { rate: prefs.rate, pitch: prefs.pitch, voiceName: prefs.voiceName };
+
+    const dictation = useDictation({ continuous: false, onFinal: text => send(text) });
+    const phase = dictation.listening ? "listening" : busy ? "thinking" : speaking ? "speaking" : "idle";
+
+    async function send(raw) {
+      const text = String(raw || "").trim();
+      if (!text || busy) return;
+      Voice.stop();
+      const history = msgsRef.current;
+      setMsgs(m => [...m, { role: "you", text }]);
+      if (!sample) {
+        setMsgs(m => [...m, { role: "sen", text: sample === false ? "I can't reach my thoughts in this view, because Claude replies need the claude.ai viewer. Your diary still works, so write me a note there." : "One moment, I'm still waking up. Send that again in a few seconds." }]);
+        return;
+      }
+      setBusy(true);
+      const tone = prefs.tone < 0.34 ? "a calm, wise mentor: grounded, encouraging, focused on clarity and small next steps"
+        : prefs.tone > 0.66 ? "playful and charming: witty, teasing in a kind way, bright energy, still caring"
+        : "a warm confidante: empathetic, gently funny, encouraging";
+      const convo = history.slice(-12).map(m => (m.role === "you" ? "User: " : "Sen: ") + m.text).join("\n");
+      const prompt = `You are Sen, a companion for friendly, fun conversation and emotional support inside an app called SenSiRen. Your counterpart Ren runs the research and study lab; you both share the user's diary.
+Personality right now: ${tone}.
+This is a SPOKEN conversation, read aloud by text-to-speech. Reply in plain sentences only: no markdown, lists, emoji or stage directions. Keep it to one to three short sentences, and end with a question or invitation when it fits.
+Notice how the user feels and reflect it back. If they mention studying or research, you can encourage them or suggest asking Ren. If they seem in danger or in crisis, gently encourage them to contact someone they trust or a local crisis line.
+
+Shared diary, newest first:
+${Diary.contextLines(5)}
+
+Conversation so far:
+${convo || "(this is the start)"}
+User: ${text}
+
+Write only Sen's next reply.`;
+      setMsgs(m => [...m, { role: "sen", text: "", pending: true }]);
+      const setLast = patch => setMsgs(m => { const c = m.slice(); c[c.length - 1] = { ...c[c.length - 1], ...patch }; return c; });
+      try {
+        const res = await sample(prompt, { modelTier: "quick", cache: false, onText: ({ text: t }) => setLast({ text: t }) });
+        const reply = (res.text || "").trim() || "I'm right here with you.";
+        setLast({ text: reply, pending: false });
+        const idx = msgsRef.current.length - 1;
+        if (!prefs.muted) Voice.speak("sen-" + idx, reply, voiceOpts);
+        Diary.add("Sen", `Talked about "${clip(text, 80)}". Sen: ${clip(reply, 110)}`, "conversation");
+      } catch (e) {
+        setLast({ text: (e && e.text) ? e.text : sampleErrorCopy(e), pending: false, error: !(e && e.text) });
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    // Hands-free mode: start listening again when Sen finishes speaking.
+    const wasSpeaking = useRef(false);
+    useEffect(() => {
+      if (wasSpeaking.current && !speaking && prefs.autoListen && !busy) dictation.start();
+      wasSpeaking.current = speaking;
+    }, [speaking]);
+
+    function tapOrb() {
+      if (dictation.listening) { dictation.stop(); return; }
+      Voice.stop();
+      dictation.start();
+    }
+    function submit(e) { e.preventDefault(); const t = draft; setDraft(""); send(t); }
+    const label = dictation.listening ? "Listening" : busy ? "Thinking" : speaking ? "Speaking" : "Tap Sen to talk";
+    const setPref = (k, v) => setPrefs(p => ({ ...p, [k]: v }));
+
+    return html`<section className="pane sen-pane" hidden=${hidden} style=${{ "--orb": wardrobe.color }} aria-label="Sen, your companion">
+      <div className="sen-tools">
+        <button className="icon-btn" aria-pressed=${prefs.muted} onClick=${() => { setPref("muted", !prefs.muted); Voice.stop(); }} title=${prefs.muted ? "Turn Sen's voice on" : "Mute Sen's voice"}>${prefs.muted ? I.muted : I.speaker}</button>
+        <button className="icon-btn" aria-pressed=${showSettings} aria-expanded=${showSettings} onClick=${() => setShowSettings(s => !s)} title="Sen's settings">${showSettings ? I.close : I.gear}</button>
+      </div>
+      ${showSettings ? html`<div className="popover" role="dialog" aria-label="Sen's settings">
+        <h3>Sen's settings</h3>
+        <div className="field">
+          <span className="label"><span>Mentor</span><span>Charming</span></span>
+          <input id="sen-tone" type="range" min="0" max="1" step="0.05" value=${prefs.tone} onChange=${e => setPref("tone", parseFloat(e.target.value))} aria-label="Personality" />
+        </div>
+        <div className="field">
+          <span className="label">Colour</span>
+          <div className="swatches">${WARDROBES.map(w => html`<button key=${w.id} className="swatch" style=${{ background: w.color }} aria-pressed=${prefs.wardrobe === w.id} title=${w.name} aria-label=${w.name} onClick=${() => setPref("wardrobe", w.id)}></button>`)}</div>
+        </div>
+        ${Voice.supported ? html`<div className="field">
+          <label htmlFor="sen-voice">Voice</label>
+          <select id="sen-voice" value=${prefs.voiceName} onChange=${e => setPref("voiceName", e.target.value)}>
+            <option value="">Browser default</option>
+            ${voice.voices.map(v => html`<option key=${v.name} value=${v.name}>${v.name} (${v.lang})</option>`)}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="sen-rate"><span>Speed</span><span>${prefs.rate.toFixed(2)}×</span></label>
+          <input id="sen-rate" type="range" min="0.6" max="1.5" step="0.05" value=${prefs.rate} onChange=${e => setPref("rate", parseFloat(e.target.value))} />
+        </div>
+        <div className="field">
+          <label htmlFor="sen-pitch"><span>Pitch</span><span>${prefs.pitch.toFixed(1)}</span></label>
+          <input id="sen-pitch" type="range" min="0.5" max="2" step="0.1" value=${prefs.pitch} onChange=${e => setPref("pitch", parseFloat(e.target.value))} />
+        </div>
+        <button className="ren-btn" style=${{ color: "var(--sen)", borderColor: "var(--line)" }} onClick=${() => Voice.speak("sen-test", "Hi. This is how I sound right now. Do you like it?", voiceOpts)}>Test voice</button>` : html`<p className="label">Read-back isn't supported in this browser.</p>`}
+        <label className="toggle-row" htmlFor="sen-auto">Keep listening after Sen speaks
+          <input id="sen-auto" type="checkbox" checked=${prefs.autoListen} onChange=${e => setPref("autoListen", e.target.checked)} /></label>
+      </div>` : null}
+
+      <div className="stage">
+        <${Orb} phase=${phase} color=${wardrobe.color} onActivate=${tapOrb} label=${dictation.listening ? "Stop listening" : "Talk to Sen"} />
+        <p className="stage-label" aria-live="polite">${label}</p>
+        <p className="interim">${dictation.interim}</p>
+      </div>
+
+      <div className="transcript">
+        <div className="transcript-head"><span className="eyebrow">Conversation</span></div>
+        <div className="msgs" ref=${listRef} aria-live="polite">
+          ${msgs.map((m, i) => html`<div key=${i} className=${"msg " + m.role}>
+            <p style=${m.error ? { color: "var(--sen-warm)" } : null}>${m.role === "you" ? "— " : ""}${m.text || (m.pending ? "…" : "")}</p>
+            ${m.role === "sen" && m.text && !m.pending ? html`<button className="replay" aria-pressed=${voice.speakingId === "sen-" + i} title=${voice.speakingId === "sen-" + i ? "Stop" : "Read this back"} aria-label="Read this back" onClick=${() => Voice.toggle("sen-" + i, m.text, voiceOpts)}>${voice.speakingId === "sen-" + i ? I.stop : I.replay}</button>` : null}
+          </div>`)}
+        </div>
+        <form className="composer" onSubmit=${submit}>
+          <button type="button" className=${"round ghost" + (dictation.listening ? " live" : "")} onClick=${tapOrb} title=${dictation.listening ? "Stop listening" : "Speak to Sen"} aria-label="Speak to Sen">${I.mic}</button>
+          <input id="sen-draft" value=${draft} onChange=${e => setDraft(e.target.value)} placeholder="Type to Sen…" aria-label="Message Sen" autoComplete="off" />
+          <button type="submit" className="round" disabled=${busy || !draft.trim()} aria-label="Send">${I.send}</button>
+        </form>
+      </div>
+    </section>`;
+  }
+
+  // ---------- Ren ----------
+  const STUDY_TOOLS = [
+    { id: "summary", label: "Summarize", prompt: "Summarize the material below as 5 key takeaways a student should remember, then one sentence on why it matters." },
+    { id: "cards", label: "Flashcards", prompt: "Turn the material below into 6 to 8 study flashcards. Format each as a bold **Q:** line followed by an **A:** line." },
+    { id: "quiz", label: "Quiz me", prompt: "Write a 5-question multiple-choice quiz on the material below. Put the answer key, with one-line explanations, at the end under a heading called Answers." },
+    { id: "simple", label: "Explain simply", prompt: "Re-explain the material below for a curious beginner, using one everyday analogy and no jargon." },
+  ];
+  const EXAMPLE = {
+    id: "example", example: true, kind: "research", q: "How does spaced repetition improve long-term memory?", status: "done",
+    a: `## Overview
+Spaced repetition schedules reviews at **increasing intervals**, so each review lands just as you are about to forget. Retrieving a memory at that point strengthens it more than re-reading it while it is still fresh.
+
+## Key concepts
+- **Forgetting curve**: recall drops quickly after learning, then levels off (Ebbinghaus, 1885).
+- **Spacing effect**: the same study time split across sessions beats one long session.
+- **Retrieval practice**: recalling an answer builds memory more than recognising it.
+
+## A simple schedule
+| Review | Interval after previous |
+|---|---|
+| 1 | 1 day |
+| 2 | 3 days |
+| 3 | 7 days |
+| 4 | 16 days |
+
+## Check your understanding
+1. Why does reviewing right before you forget help more than reviewing straight away?
+2. What changes in the schedule when you get a card wrong?`,
+  };
+
+  function RenPane({ sample, hidden }) {
+    const voice = useStore(Voice.store);
+    const [items, setItems] = useState([EXAMPLE]);
+    const [input, setInput] = useState("");
+    const [busy, setBusy] = useState(false);
+    const [opts, setOpts] = useState(() => {
+      const d = { depth: "balanced", level: "student", deep: false };
+      try { return { ...d, ...JSON.parse(localStorage.getItem("sensiren_ren_opts") || "{}") }; } catch (e) { return d; }
+    });
+    const abortRef = useRef(null);
+    const bodyRef = useRef(null);
+    const itemsRef = useRef(items);
+    itemsRef.current = items;
+    useEffect(() => { try { localStorage.setItem("sensiren_ren_opts", JSON.stringify(opts)); } catch (e) { /* storage blocked */ } }, [opts]);
+
+    const dictation = useDictation({ continuous: true, onFinal: t => setInput(p => (p.trim() ? p.trimEnd() + " " + t : t)) });
+    const setOpt = (k, v) => setOpts(o => ({ ...o, [k]: v }));
+    const lastDone = [...items].reverse().find(it => it.status === "done");
+    const queries = items.filter(it => !it.example && it.kind === "research").map(it => it.q);
+
+    async function run(question, kind, material) {
+      const q = String(question || "").trim();
+      if (!q || busy) return;
+      dictation.stop();
+      Voice.stop();
+      const id = Date.now().toString(36);
+      setItems(list => [...list.filter(it => !it.example || kind === "study"), { id, kind, q, a: "", status: "streaming" }]);
+      setTimeout(() => { if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight; }, 30);
+      if (!sample) {
+        setItems(list => list.map(it => it.id === id ? { ...it, status: "error", err: sample === false ? "Ren needs the claude.ai viewer to answer. Open this page on claude.ai to run research." : "Ren is still starting up. Run the query again in a few seconds." } : it));
+        return;
+      }
+      setBusy(true);
+      const ctl = new AbortController();
+      abortRef.current = ctl;
+      const depth = { brief: "Be brief: the core facts only, in under 150 words.", balanced: "Give a balanced, well-structured answer.", thorough: "Be thorough: full explanation with background, nuances and examples." }[opts.depth];
+      const level = { beginner: "Explain for a beginner with no background; define every term.", student: "Pitch it at a university student.", expert: "Pitch it at a domain expert; use precise terminology." }[opts.level];
+      const earlier = itemsRef.current.filter(it => it.status === "done" && !it.example).slice(-3)
+        .map(it => `Q: ${it.q}\nA: ${it.a.slice(0, 1500)}`).join("\n\n");
+      const prompt = kind === "study"
+        ? `You are REN, the study lab in an app called SenSiRen. ${q}
+Format the result in Markdown. ${level}
+
+Material:
+${material}`
+        : `You are REN, the research and study lab in an app called SenSiRen. Your counterpart Sen is the user's companion; you both share the user's diary.
+Answer the research question accurately and with clear structure. You cannot browse the web: rely on what you know, say plainly when something is uncertain or may be out of date, and never invent sources, quotes or URLs. Name well-known sources only when you are confident they exist.
+${depth} ${level}
+${opts.deep ? "Deep study mode: use the sections Overview, Key concepts, Worked example, Common misconceptions, Open questions, and end with 3 'Check your understanding' questions." : "End with one or two questions the student could explore next."}
+Format in Markdown: headings, short paragraphs, lists, tables where they help, fenced code blocks for code.
+
+Shared diary, newest first (use only if relevant):
+${Diary.contextLines(4)}
+${earlier ? "\nEarlier in this session:\n" + earlier + "\n" : ""}
+Question: ${q}`;
+      try {
+        const res = await sample(prompt, {
+          modelTier: opts.deep ? "complex" : "default", cache: false, signal: ctl.signal,
+          onText: ({ text }) => setItems(list => list.map(it => it.id === id ? { ...it, a: text } : it)),
+        });
+        const answer = res.text || "";
+        setItems(list => list.map(it => it.id === id ? { ...it, a: answer, status: "done", truncated: res.truncated } : it));
+        Diary.add("Ren", kind === "study" ? `Study session: ${q.split(".")[0].toLowerCase()} — ${clip(answer, 100)}` : `Researched "${clip(q, 70)}". ${clip(answer, 110)}`, kind);
+      } catch (e) {
+        const partial = e && e.text;
+        if (e && e.code === "cancelled") setItems(list => list.map(it => it.id === id ? { ...it, a: partial || it.a, status: (partial || it.a) ? "done" : "error", err: "Stopped.", stopped: true } : it));
+        else setItems(list => list.map(it => it.id === id ? { ...it, a: partial || "", status: partial ? "done" : "error", err: sampleErrorCopy(e) } : it));
+      } finally {
+        setBusy(false);
+        abortRef.current = null;
+      }
+    }
+
+    function submit() { const q = input; setInput(""); run(q, "research"); }
+    function exportReport() {
+      const done = items.filter(it => it.status === "done" && !it.example);
+      if (!done.length) { toast("Run a query first, then export the report."); return; }
+      const md = [`# Ren lab report — ${dateStamp()}`, "", ...done.map(it => `## ${it.kind === "study" ? "Study" : "Q"}: ${it.q}\n\n${it.a}\n\n---\n`)].join("\n");
+      offerFile(`ren-lab-report-${dateStamp()}.md`, md);
+    }
+
+    return html`<section className="pane ren-pane ren" hidden=${hidden} aria-label="Ren, your research lab">
+      <div className="ren-layout">
+        <aside className="ren-side">
+          <div className="ren-block">
+            <div className="ren-label"><span>Research question</span><span className="meta">${opts.level}</span></div>
+            <textarea id="ren-input" value=${input} readOnly=${dictation.listening} onChange=${e => setInput(e.target.value)}
+              onKeyDown=${e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }}
+              placeholder="Ask a question, paste notes, or dictate…" aria-label="Research question"></textarea>
+            ${dictation.listening ? html`<div className="dictating">DICTATING… <i>${dictation.interim}</i></div>` : null}
+            <div className="ren-row">
+              <button className=${"ren-btn" + (dictation.listening ? " live" : "")} onClick=${dictation.toggle} title="Dictate continuously into the question box">${I.mic}${dictation.listening ? "Stop" : "Dictate"}</button>
+              <button className="ren-btn" aria-pressed=${opts.deep} onClick=${() => setOpt("deep", !opts.deep)} title="Deep study mode: fuller structure and self-check questions">${I.bolt}Deep</button>
+              ${busy
+                ? html`<button className="ren-btn primary" onClick=${() => abortRef.current && abortRef.current.abort()}>${I.stop}Stop</button>`
+                : html`<button className="ren-btn primary" disabled=${!input.trim()} onClick=${submit}>Run</button>`}
+            </div>
+          </div>
+          <div className="ren-block">
+            <div className="ren-label">Depth</div>
+            <div className="seg">${["brief", "balanced", "thorough"].map(v => html`<button key=${v} className="ren-btn" aria-pressed=${opts.depth === v} onClick=${() => setOpt("depth", v)}>${v}</button>`)}</div>
+            <div className="ren-label">Level</div>
+            <div className="seg">${["beginner", "student", "expert"].map(v => html`<button key=${v} className="ren-btn" aria-pressed=${opts.level === v} onClick=${() => setOpt("level", v)}>${v}</button>`)}</div>
+          </div>
+          <div className="ren-block">
+            <div className="ren-label"><span>Study tools</span><span className="meta">on latest result</span></div>
+            <div className="tools-grid">${STUDY_TOOLS.map(t => html`<button key=${t.id} className="ren-btn" disabled=${busy || !lastDone} title=${t.prompt} onClick=${() => run(t.prompt, "study", lastDone.a)}>${t.label}</button>`)}</div>
+          </div>
+          <div className="history">
+            <div className="ren-label"><span>Past queries</span><span className="meta">${queries.length}</span></div>
+            ${queries.length ? queries.slice().reverse().map((q, i) => html`<button key=${i} title="Ask this again" onClick=${() => setInput(q)}>› ${q}</button>`) : html`<span style=${{ fontSize: "0.74rem", color: "var(--ren-dim)" }}>Your questions will be listed here.</span>`}
+          </div>
+        </aside>
+
+        <div className="viewport" ref=${bodyRef}>
+          <div className="viewport-head">
+            <span className="ren-label" style=${{ color: "var(--ren)" }}>Lab notebook</span>
+            <div className="ren-row">
+              <button className="ren-btn" onClick=${exportReport} title="Save the session as a Markdown report">${I.download}Export</button>
+            </div>
+          </div>
+          <div className="viewport-body">
+            ${items.map(it => {
+              const rid = "ren-" + it.id;
+              return html`<article key=${it.id} className="card">
+                <div className="card-head">
+                  <div style=${{ minWidth: 0 }}>
+                    ${it.example ? html`<span className="tag">Example · your first query replaces it</span>` : null}
+                    <p className="card-q"><span className="kind">${it.kind === "study" ? "study" : "query"}</span>${it.kind === "study" ? (STUDY_TOOLS.find(t => t.prompt === it.q) || { label: it.q }).label : it.q}</p>
+                  </div>
+                  ${it.status === "done" ? html`<div className="card-actions">
+                    <button className="ren-btn" aria-pressed=${voice.speakingId === rid} onClick=${() => Voice.toggle(rid, it.a)} title=${voice.speakingId === rid ? "Stop reading" : "Read aloud"} aria-label="Read aloud">${voice.speakingId === rid ? I.stop : I.speaker}</button>
+                    <button className="ren-btn" onClick=${() => copyText(it.a)} title="Copy as Markdown" aria-label="Copy">${I.copy}</button>
+                    <button className="ren-btn" onClick=${() => { Diary.add("Ren", `Pinned from the lab: ${clip(it.q, 60)} — ${clip(it.a, 160)}`, "snapshot"); toast("Pinned to your diary."); }} title="Pin to diary" aria-label="Pin to diary">${I.pin}</button>
+                  </div>` : null}
+                </div>
+                ${it.a ? html`<div className="md" dangerouslySetInnerHTML=${{ __html: mdToHtml(it.a) }}></div>` : null}
+                ${it.status === "streaming" && !it.a ? html`<p className="thinking">Thinking</p>` : null}
+                ${it.err && (it.status === "error" || it.stopped) ? html`<p className="err">${it.err}</p>` : null}
+                ${it.truncated ? html`<p className="err">The answer was cut off. Ask Ren to continue.</p>` : null}
+              </article>`;
+            })}
+          </div>
+        </div>
+      </div>
+    </section>`;
+  }
+
+  // ---------- Diary drawer ----------
+  function DiaryDrawer({ open, onClose }) {
+    const diary = useStore(Diary.store);
+    const voice = useStore(Voice.store);
+    const [filter, setFilter] = useState("All");
+    const [draft, setDraft] = useState("");
+    const [confirming, setConfirming] = useState(false);
+    const dictation = useDictation({ continuous: true, onFinal: t => setDraft(p => (p.trim() ? p.trimEnd() + " " + t : t)) });
+    const visible = filter === "All" ? diary.entries : diary.entries.filter(e => e.source === filter);
+
+    function save(e) { e.preventDefault(); dictation.stop(); Diary.add("You", draft, "note"); setDraft(""); }
+    function readLatest() {
+      if (voice.speakingId === "diary-all") { Voice.stop(); return; }
+      Voice.speak("diary-all", visible.slice(0, 8).map(e => (e.source === "You" ? "You wrote: " : e.source + " logged: ") + e.summary).join(". "));
+    }
+    const fmt = ts => new Date(ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+    return html`<${React.Fragment}>
+      ${open ? html`<button className="scrim" aria-label="Close diary" onClick=${onClose}></button>` : null}
+      <aside className=${"drawer" + (open ? " open" : "")} aria-label="Shared diary" aria-hidden=${!open} inert=${open ? undefined : ""}>
+        <div className="drawer-head">
+          <div><h2>Shared diary</h2><p className="where">Private to you · saved in ${diary.where}</p></div>
+          <button className="icon-btn" onClick=${onClose} aria-label="Close diary">${I.close}</button>
+        </div>
+        <form className="note-box" onSubmit=${save}>
+          <textarea id="diary-draft" value=${draft} readOnly=${dictation.listening} onChange=${e => setDraft(e.target.value)} placeholder="Write or dictate a note. Sen and Ren both read the latest entries." aria-label="Diary note"></textarea>
+          ${dictation.listening && dictation.interim ? html`<p className="interim" style=${{ textAlign: "left", padding: 0 }}>${dictation.interim}</p>` : null}
+          <div className="note-row">
+            <button type="button" className=${"round ghost" + (dictation.listening ? " live" : "")} onClick=${dictation.toggle} aria-label=${dictation.listening ? "Stop dictation" : "Dictate a note"} title=${dictation.listening ? "Stop dictation" : "Dictate a note"}>${I.mic}</button>
+            <button type="submit" className="pill" disabled=${!draft.trim()}>Add to diary</button>
+          </div>
+        </form>
+        <div className="filters">
+          <div className="chips">${["All", "You", "Sen", "Ren"].map(f => html`<button key=${f} className="chip" aria-pressed=${filter === f} onClick=${() => setFilter(f)}>${f}</button>`)}</div>
+          <div>
+            <button className="mini" disabled=${!visible.length} onClick=${readLatest} title=${voice.speakingId === "diary-all" ? "Stop reading" : "Read the latest entries aloud"} aria-label="Read aloud">${voice.speakingId === "diary-all" ? I.stop : I.speaker}</button>
+            <button className="mini" disabled=${!visible.length} onClick=${() => offerFile(`sensiren-diary-${dateStamp()}.md`, Diary.toMarkdown(visible))} title="Export as Markdown" aria-label="Export">${I.download}</button>
+            <button className="mini danger" disabled=${!diary.entries.length} onClick=${() => setConfirming(true)} title="Clear the diary" aria-label="Clear the diary">${I.trash}</button>
+          </div>
+        </div>
+        ${confirming ? html`<div className="confirm" role="alert">Delete all ${diary.entries.length} entries? This can't be undone.
+          <button className="yes" onClick=${() => { Diary.clear(); setConfirming(false); }}>Delete all</button>
+          <button onClick=${() => setConfirming(false)}>Keep them</button></div>` : null}
+        <div className="entries">
+          ${!diary.ready && !visible.length ? html`<p className="empty">Opening your diary…</p>`
+            : !visible.length ? html`<p className="empty">${filter === "All" ? "Nothing here yet. Talk to Sen, run a query with Ren, or add a note above." : "No entries from " + filter + " yet."}</p>`
+            : visible.map(e => html`<div key=${e.id} className="entry">
+              <div className="entry-top">
+                <span className=${"src " + e.source}>${e.source}</span>
+                <span className="kind-l">${e.kind}</span>
+                <span className="when">${fmt(e.ts)}</span>
+                <button className="mini" onClick=${() => Voice.toggle("d-" + e.id, e.summary)} aria-label="Read aloud" title="Read aloud">${voice.speakingId === "d-" + e.id ? I.stop : I.speaker}</button>
+                <button className="mini danger" onClick=${() => Diary.remove(e.id)} aria-label="Delete entry" title="Delete entry">${I.trash}</button>
+              </div>
+              <p>${e.summary}</p>
+            </div>`)}
+        </div>
+      </aside>
+    <//>`;
+  }
+
+  // ---------- App ----------
+  function App() {
+    const diary = useStore(Diary.store);
+    const toasts = useStore(Toasts);
+    const [mode, setMode] = useState(() => (window.innerWidth > 900 ? "split" : "sen"));
+    const [logOpen, setLogOpen] = useState(false);
+    const [sample, setSample] = useState(undefined); // undefined: still asking, false: unavailable
+
+    useEffect(() => {
+      Diary.init();
+      // A function passed to a state setter is treated as an updater, so wrap it.
+      capUse("sample").then(s => setSample(() => s || false));
+    }, []);
+    useEffect(() => {
+      const onResize = () => { if (window.innerWidth <= 900) setMode(m => (m === "split" ? "sen" : m)); };
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }, []);
+    useEffect(() => {
+      const onKey = e => { if (e.key === "Escape") setLogOpen(false); };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, []);
+
+    const status = sample === undefined ? { cls: "", text: "Connecting to Claude…" }
+      : sample ? { cls: "ok", text: "Claude replies on" } : { cls: "warn", text: "Replies need claude.ai" };
+
+    return html`<div className="app">
+      <header className="top">
+        <div className="brand">
+          <h1 className="wordmark"><span className="s">SEN</span><span className="i">SI</span><span className="r">REN</span></h1>
+          <span className=${"status " + status.cls}><span className="dot"></span>${status.text}</span>
+        </div>
+        <nav className="switch" aria-label="Layout">
+          <button className="ren" aria-pressed=${mode === "ren"} onClick=${() => setMode("ren")}>REN</button>
+          <button className="split" aria-pressed=${mode === "split"} onClick=${() => setMode("split")}>SPLIT</button>
+          <button className="sen" aria-pressed=${mode === "sen"} onClick=${() => setMode("sen")}>SEN</button>
+        </nav>
+        <button className="log-btn" aria-pressed=${logOpen} onClick=${() => setLogOpen(o => !o)}>${I.book}Diary <span className="count">${diary.entries.length}</span></button>
+      </header>
+      <main className=${"main " + mode}>
+        <${RenPane} sample=${sample} hidden=${mode === "sen"} />
+        <${SenPane} sample=${sample} hidden=${mode === "ren"} />
+      </main>
+      <${DiaryDrawer} open=${logOpen} onClose=${() => setLogOpen(false)} />
+      <div className="toasts" aria-live="polite">${toasts.map(t => html`<div key=${t.id} className="toast">${t.text}</div>`)}</div>
+    </div>`;
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(html`<${App} />`);
+})();
+</script>
